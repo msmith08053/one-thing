@@ -246,12 +246,106 @@ export const ART = {
     <circle cx="28" cy="30" r="10" fill="${C.cream}"/><circle cx="28" cy="30" r="5" fill="none" stroke="${C.woodD}" stroke-width="2"/>
     <rect x="44" y="22" width="18" height="6" rx="2" fill="${C.cream}"/><circle cx="48" cy="38" r="3" fill="${C.cream}"/><circle cx="58" cy="38" r="3" fill="${C.cream}"/>
     <path d="M22 14 L34 2" stroke="${C.woodDD}" stroke-width="2" stroke-linecap="round"/>` }),
+
+  // ---------- seasonal ----------
+  pumpkin: () => ({ body: `
+    <ellipse cx="26" cy="48" rx="18" ry="22" fill="#F08A3C"/><ellipse cx="54" cy="48" rx="18" ry="22" fill="#F08A3C"/>
+    <ellipse cx="40" cy="48" rx="20" ry="24" fill="#F59A4A"/>
+    <path d="M38 24 Q40 14 46 10" stroke="${C.leafD}" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M28 40 L34 34 L36 42 Z M52 40 L46 34 L44 42 Z" fill="#7A3A12"/>
+    <path d="M27 54 Q40 66 53 54 L49 58 L45 55 L40 60 L35 55 L31 58 Z" fill="#7A3A12"/>` }),
+  bat_garland: () => {
+    const bat = (x, y) => `<path d="M${x} ${y} q-6 -6 -14 -2 q4 2 4 6 q4 -3 6 0 q2 -4 4 -4 q2 0 4 4 q2 -3 6 0 q0 -4 4 -6 q-8 -4 -14 2 Z" fill="#5E4E8C"/>`;
+    return { body: `<path d="M0 6 Q150 44 300 6" fill="none" stroke="${C.woodDD}" stroke-width="2"/>` +
+      [0, 1, 2, 3, 4, 5, 6].map((i) => { const x = 25 + i * 42; const y = 8 + Math.sin((i + 0.5) / 7 * Math.PI) * 18; return i % 2 ? `<path d="M${x - 8} ${y} L${x + 8} ${y} L${x} ${y + 16} Z" fill="#F59A4A"/>` : bat(x, y + 8); }).join('') };
+  },
+  lamp_jackolantern: (n) => ({ body: `
+    <rect x="12" y="140" width="50" height="8" rx="3" fill="${C.wood}"/><path d="M18 148 L14 192 M56 148 L60 192" stroke="${C.woodD}" stroke-width="5" stroke-linecap="round"/>
+    <ellipse cx="25" cy="118" rx="14" ry="20" fill="#F08A3C"/><ellipse cx="49" cy="118" rx="14" ry="20" fill="#F08A3C"/><ellipse cx="37" cy="118" rx="17" ry="22" fill="#F59A4A"/>
+    <path d="M36 97 Q37 90 42 87" stroke="${C.leafD}" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M27 112 L32 106 L34 114 Z M47 112 L42 106 L40 114 Z M26 124 Q37 134 48 124 L44 127 L37 131 L30 127 Z" fill="#FFD460"/>`,
+    glow: glowCircle(37, 118, 26, n) + (n ? `<path d="M27 112 L32 106 L34 114 Z M47 112 L42 106 L40 114 Z M26 124 Q37 134 48 124 L44 127 L37 131 L30 127 Z" fill="#FFE07A"/>` : '') }),
+  tree_holiday: (n) => {
+    const orn = [[30, 70, C.pink], [46, 92, C.blue], [24, 112, C.butter], [50, 128, C.pink], [32, 140, C.lav], [42, 54, C.butter]];
+    return {
+      body: `<rect x="31" y="160" width="12" height="16" fill="${C.woodD}"/><path d="M20 176 L54 176 L50 192 L24 192 Z" fill="${C.terra}"/>
+        <path d="M37 30 L62 90 L12 90 Z" fill="${C.leaf}"/><path d="M37 60 L68 130 L6 130 Z" fill="${C.leafD}"/><path d="M37 96 L72 164 L2 164 Z" fill="${C.leaf}"/>
+        <path d="M37 14 l4 9 10 1 -8 6 3 10 -9 -6 -9 6 3 -10 -8 -6 10 -1 Z" fill="#FFD45C"/>` +
+        orn.map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="5" fill="${c}"/>`).join(''),
+      glow: n ? orn.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="12" fill="url(#__GLOW__)" opacity=".8"/>`).join('') + `<circle cx="37" cy="26" r="20" fill="url(#__GLOW__)"/>` : '',
+    };
+  },
+  snow_garland: () => {
+    const flake = (x, y, r) => `<g stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M${x - r} ${y} L${x + r} ${y} M${x - r * 0.5} ${y - r * 0.87} L${x + r * 0.5} ${y + r * 0.87} M${x - r * 0.5} ${y + r * 0.87} L${x + r * 0.5} ${y - r * 0.87}"/></g><circle cx="${x}" cy="${y}" r="2" fill="${C.blue}"/>`;
+    return { body: `<path d="M0 6 Q150 44 300 6" fill="none" stroke="#B8C9DA" stroke-width="2"/>` +
+      [0, 1, 2, 3, 4, 5, 6].map((i) => { const x = 25 + i * 42; const y = 14 + Math.sin((i + 0.5) / 7 * Math.PI) * 18; return `<circle cx="${x}" cy="${y}" r="11" fill="${C.blue}" opacity=".35"/>` + flake(x, y, 8); }).join('') };
+  },
+  gift_stack: () => ({ body: `
+    <rect x="6" y="36" width="40" height="34" rx="3" fill="${C.pink}"/><rect x="23" y="36" width="6" height="34" fill="#fff"/><rect x="6" y="49" width="40" height="6" fill="#fff"/>
+    <rect x="42" y="44" width="32" height="26" rx="3" fill="${C.mint}"/><rect x="55" y="44" width="6" height="26" fill="${C.butter}"/>
+    <rect x="16" y="14" width="30" height="22" rx="3" fill="${C.lav}"/><rect x="28" y="14" width="6" height="22" fill="${C.butter}"/>
+    <path d="M31 14 q-10 -10 -12 0 Z M31 14 q10 -10 12 0 Z" fill="${C.butter}"/>` }),
+  tulips: () => {
+    const fl = [[22, 52, C.pink], [40, 40, C.butter], [58, 50, '#E86A6A'], [31, 66, '#E86A6A'], [50, 64, C.pink]];
+    return { body: fl.map(([x, y]) => `<path d="M${x} ${y + 8} Q${(x + 40) / 2} ${y + 50} 40 120" stroke="${C.leafD}" stroke-width="3" fill="none"/>`).join('') +
+      `<ellipse cx="28" cy="104" rx="5" ry="14" fill="${C.leaf}" transform="rotate(-20 28 104)"/><ellipse cx="52" cy="104" rx="5" ry="14" fill="${C.leafL}" transform="rotate(20 52 104)"/>` +
+      fl.map(([x, y, c]) => `<path d="M${x - 8} ${y} Q${x - 8} ${y + 14} ${x} ${y + 14} Q${x + 8} ${y + 14} ${x + 8} ${y} L${x + 4} ${y + 5} L${x} ${y - 2} L${x - 4} ${y + 5} Z" fill="${c}"/>`).join('') +
+      pot(20, 116, 40, 44) };
+  },
+  flower_garland: () => {
+    const cols = [C.pink, C.butter, C.lav, C.peach, C.pink, C.butter, C.lav];
+    return { body: `<path d="M0 6 Q150 44 300 6" fill="none" stroke="${C.leafD}" stroke-width="2.5"/>` +
+      cols.map((c, i) => { const x = 25 + i * 42; const y = 10 + Math.sin((i + 0.5) / 7 * Math.PI) * 18;
+        return `<ellipse cx="${x - 9}" cy="${y + 4}" rx="6" ry="3" fill="${C.leaf}" transform="rotate(-20 ${x - 9} ${y + 4})"/>` +
+          [0, 72, 144, 216, 288].map((a) => `<circle cx="${x + Math.cos(a * Math.PI / 180) * 6}" cy="${y + Math.sin(a * Math.PI / 180) * 6}" r="5" fill="${c}"/>`).join('') +
+          `<circle cx="${x}" cy="${y}" r="4" fill="#fff"/>`; }).join('') };
+  },
 };
 
-const THUMB_BOX = { lights_string: '0 -6 300 64', bunting: '0 -2 300 50', paper_lanterns: '30 -4 240 96', plant_hanging: '95 -4 110 132' };
+// Wallpapers and floors (style spots, not placed objects)
+const WALLS = {
+  default:      { a: '#FCEBD0', b: '#F8E2C2', type: 'stripes' },
+  wall_mint:    { a: '#E6F4EB', b: '#CDE9D7', type: 'stripes' },
+  wall_dots:    { a: '#FFF1E9', b: '#F6C4B1', type: 'dots' },
+  wall_gingham: { a: '#EEF5FC', b: '#C9DEF2', type: 'gingham' },
+  wall_diamond: { a: '#F1ECFA', b: '#D8CDF1', type: 'diamond' },
+};
+const FLOORS = {
+  default:       { a: '#E5B583', b: '#D9A673', type: 'planks' },
+  floor_walnut:  { a: '#A9724A', b: '#8E5E3B', type: 'planks' },
+  floor_checker: { a: '#F7F0E4', b: '#CFC2EA', type: 'checker' },
+  floor_carpet:  { a: '#A9C8E6', b: '#93B5D8', type: 'carpet' },
+};
+function wallPattern(pid, w) {
+  const { a, b, type } = w;
+  if (type === 'dots') return `<pattern id="${pid}" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="${a}"/><circle cx="7" cy="7" r="4" fill="${b}"/><circle cx="21" cy="21" r="4" fill="${b}"/></pattern>`;
+  if (type === 'gingham') return `<pattern id="${pid}" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="${a}"/><rect width="12" height="24" fill="${b}" opacity=".55"/><rect width="24" height="12" fill="${b}" opacity=".55"/></pattern>`;
+  if (type === 'diamond') return `<pattern id="${pid}" width="30" height="30" patternUnits="userSpaceOnUse"><rect width="30" height="30" fill="${a}"/><path d="M15 4 L25 15 L15 26 L5 15 Z" fill="${b}"/></pattern>`;
+  return `<pattern id="${pid}" width="36" height="10" patternUnits="userSpaceOnUse"><rect width="18" height="10" fill="${a}"/><rect x="18" width="18" height="10" fill="${b}"/></pattern>`;
+}
+function floorPattern(pid, f) {
+  const { a, b, type } = f;
+  if (type === 'checker') return `<pattern id="${pid}" width="48" height="24" patternUnits="userSpaceOnUse"><rect width="48" height="24" fill="${a}"/><rect width="24" height="12" fill="${b}"/><rect x="24" y="12" width="24" height="12" fill="${b}"/></pattern>`;
+  if (type === 'carpet') return `<pattern id="${pid}" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="${a}"/><circle cx="4" cy="4" r="1.3" fill="${b}"/><circle cx="12" cy="11" r="1.3" fill="${b}"/></pattern>`;
+  return `<pattern id="${pid}" width="73" height="30" patternUnits="userSpaceOnUse"><rect width="73" height="30" fill="${a}"/><rect x="70" width="3" height="30" fill="${b}"/></pattern>`;
+}
+export const STYLE_SPOTS = {
+  wallpaper: { label: 'Wallpaper' },
+  floor: { label: 'Floor' },
+};
+
+const THUMB_BOX = { lights_string: '0 -6 300 64', bunting: '0 -2 300 50', paper_lanterns: '30 -4 240 96', plant_hanging: '95 -4 110 132', bat_garland: '0 -2 300 56', snow_garland: '0 -2 300 56', flower_garland: '0 -2 300 56' };
 
 // A single item, framed for a store card or list.
 export function itemThumb(itemId, spot, cls = '') {
+  if (spot === 'wallpaper' || spot === 'floor') {
+    const pid = 's' + (++uid);
+    const w = spot === 'wallpaper' ? WALLS[itemId] || WALLS.default : WALLS.default;
+    const f = spot === 'floor' ? FLOORS[itemId] || FLOORS.default : FLOORS.default;
+    return `<svg class="${cls}" viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>${wallPattern(pid + 'w', w)}${floorPattern(pid + 'f', f)}</defs>
+      <rect width="120" height="${spot === 'wallpaper' ? 66 : 34}" fill="url(#${pid}w)"/><rect y="${spot === 'wallpaper' ? 66 : 34}" width="120" height="${spot === 'wallpaper' ? 24 : 56}" fill="url(#${pid}f)"/>
+      <rect y="${spot === 'wallpaper' ? 62 : 30}" width="120" height="5" fill="#E9C9A0"/></svg>`;
+  }
   const s = SPOTS[spot]; const art = ART[itemId]?.(false);
   if (!s || !art) return '';
   const vb = THUMB_BOX[itemId] || `-6 -6 ${s.w + 12} ${s.h + 12}`;
@@ -264,8 +358,8 @@ const glowDef = (gid) => `<defs><radialGradient id="${gid}"><stop offset="0" sto
 // The whole room. placed: { spot: item_id }. opts: { night, slice, empty }
 export function roomSVG(placed, opts = {}) {
   const n = !!opts.night; const id = 'r' + (++uid);
-  const wallA = n ? '#E3CDB2' : '#FCEBD0', wallB = n ? '#DBC2A5' : '#F8E2C2';
-  const floorA = n ? '#CC9E70' : '#E5B583', floorB = n ? '#BF915F' : '#D9A673';
+  const wall = WALLS[placed.wallpaper] || WALLS.default;
+  const floor = FLOORS[placed.floor] || FLOORS.default;
   let items = '', glows = '';
   for (const spot of ORDER) {
     const itemId = placed[spot]; if (!itemId || !ART[itemId]) continue;
@@ -277,15 +371,15 @@ export function roomSVG(placed, opts = {}) {
   return `<svg class="room-svg" viewBox="0 0 360 430" preserveAspectRatio="${opts.slice ? 'xMidYMax slice' : 'xMidYMid meet'}" role="img" aria-label="Your shared room${opts.empty ? ', still empty' : ''}">
     ${glowDef(id + 'g')}
     <defs>
-      <pattern id="${id}w" width="36" height="10" patternUnits="userSpaceOnUse"><rect width="18" height="10" fill="${wallA}"/><rect x="18" width="18" height="10" fill="${wallB}"/></pattern>
-      <pattern id="${id}f" width="73" height="30" patternUnits="userSpaceOnUse"><rect width="73" height="30" fill="${floorA}"/><rect x="70" width="3" height="30" fill="${floorB}"/></pattern>
+      ${wallPattern(id + 'w', wall)}
+      ${floorPattern(id + 'f', floor)}
     </defs>
     <rect width="360" height="282" fill="url(#${id}w)"/>
     <rect y="282" width="360" height="148" fill="url(#${id}f)"/>
     <rect y="270" width="360" height="14" fill="${n ? '#D4B48E' : '#E9C9A0'}"/>
     ${glows && !n ? glows : ''}
     ${items}
-    ${n ? `<rect width="360" height="430" fill="#1F2552" opacity=".34"/>${glows}` : ''}
+    ${n ? `<rect width="360" height="430" fill="#1F2552" opacity=".38"/>${glows}` : ''}
   </svg>`;
 }
 

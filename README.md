@@ -41,7 +41,7 @@ You need a computer for steps 1–8 (any computer with a web browser), then your
 1. Left sidebar → **SQL Editor** → **New query**.
 2. Open `supabase/schema.sql` from this folder, copy **everything**, and paste it in.
 3. Click **Run**. You should see *Success. No rows returned.*
-4. Do the same with `supabase/002_our_home.sql` (the "Our Home" upgrade).
+4. Do the same with `supabase/002_our_home.sql`, then `supabase/003_lists_pause_together.sql` (in that order).
 
 ### 3. Make your notification keys
 
@@ -149,10 +149,17 @@ sw.js, manifest.webmanifest      make it installable + receive notifications
 icons/                           home-screen icon
 supabase/schema.sql              database setup (step 2)
 supabase/002_our_home.sql        Our Home upgrade: Stars, levels, Store (step 2.4)
+supabase/003_lists_pause_together.sql  Lists, new Pause, together timer, seasonal + walls
+version.json                     tells phones a new version is out (bump it with each update)
 supabase/functions/notify/       notification sender (step 4)
 supabase/cron.sql                7 a.m. / 7 p.m. schedule (step 5)
 tools/make-keys.html             key generator (step 3)
 ```
+
+## Updates
+
+- `UPGRADE.md`: Our Home (Stars, levels, Store)
+- `UPGRADE-v3.md`: Lists, new Pause, Do it together, seasonal items, walls & floors
 
 ## Roadmap
 

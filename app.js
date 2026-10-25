@@ -1,7 +1,9 @@
-// One Thing — app logic (v2: Our Home)
+// One Thing — app logic (v3: Lists, new Pause, Do it together)
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { CONFIG } from './config.js';
-import { SPOTS, roomSVG, itemThumb, isEvening } from './room.js';
+import { SPOTS, STYLE_SPOTS, roomSVG, itemThumb, isEvening } from './room.js?v=3';
+
+const APP_VERSION = '3';
 
 // ---------- Small helpers ----------------------------------------------------
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -21,6 +23,10 @@ const ICON = {
   pause: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>`,
   cross: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
   lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
+  gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`,
+  bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>`,
+  cal: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+  people: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.8"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M15.5 14.6c2.6-.3 5 1.3 6 5.4"/></svg>`,
 };
 
 function parseDay(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
@@ -77,7 +83,10 @@ const S = {
   status: null, board: null, home: null,
   tab: 'today', moreTab: 'all', allFilter: 'open',
   addOwner: null, addPri: 1, storeCat: 'all', storeSpot: null,
+  lists: null, list: 'groceries', listInput: '',
+  pauseOpen: null, pauseDraft: null,
 };
+const allSpots = () => ({ ...SPOTS, ...STYLE_SPOTS });
 const me = () => S.status?.person;                       // 'p1' | 'p2' | 'shared'
 const isPerson = (p) => p === 'p1' || p === 'p2';
 const nameOf = (p) => p === 'both' ? 'Both of us' : p === 'wall' ? 'The wall display' : (S.status?.names?.[p] ?? p);
@@ -89,7 +98,7 @@ const levelChip = () => S.home ? `<div class="lvl" aria-label="Level ${S.home.le
 const header = (eyebrow, title) => `
   <header class="top">
     <div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div>
-    <div class="top-right">${levelChip()}${starPill()}</div>
+    <div class="top-right">${levelChip()}${starPill()}<button class="gear" data-act="settings" aria-label="Settings">${ICON.gear}</button></div>
   </header>`;
 
 // ---------- Boot -------------------------------------------------------------
@@ -188,7 +197,7 @@ function renderWho(first) {
   </div>`;
   main().querySelectorAll('[data-p]').forEach((b) => b.onclick = async () => {
     const r = await rpc('set_person', { p_person: b.dataset.p });
-    if (r) { S.status = r; first ? startApp() : (S.tab = 'more', S.moreTab = 'settings', render()); }
+    if (r) { S.status = r; first ? startApp() : (S.tab = 'settings', render()); }
   });
 }
 
@@ -204,35 +213,65 @@ function startApp() {
       S.tab = b.dataset.tab; render();
     });
     main().addEventListener('click', onMainClick);
+    main().addEventListener('input', onMainInput);
+    main().addEventListener('change', onMainInput);
 
-    // Live sync: tasks/picks → board; owned/ledger → home.
-    let tb, th;
-    const reloadBoard = () => { clearTimeout(tb); tb = setTimeout(() => { loadBoard(); if (S.tab === 'more' && S.moreTab === 'all') renderAll(); }, 300); };
+    $('#fab').addEventListener('click', () => { S.tab = 'add'; render(); });
+
+    // Live sync: tasks/picks/together → board; owned/ledger → home; shopping → lists.
+    let tb, th, tl;
+    const reloadBoard = () => { clearTimeout(tb); tb = setTimeout(() => { loadBoard(); if (S.tab === 'all') renderAll(); }, 300); };
     const reloadHome = () => { clearTimeout(th); th = setTimeout(loadHome, 300); };
+    const reloadLists = () => { clearTimeout(tl); tl = setTimeout(loadLists, 300); };
     sb.channel('one-thing')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, reloadBoard)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'picks' }, reloadBoard)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'together' }, reloadBoard)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'owned' }, reloadHome)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger' }, reloadHome)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shop_items' }, reloadLists)
       .subscribe();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadBoard(); loadHome(); } });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadBoard(); loadHome(); loadLists(); checkVersion(); } });
     setInterval(() => { loadBoard(); loadHome(); }, 5 * 60 * 1000); // 4 a.m. rollover + evening mode
+    setInterval(tickTimer, 1000);
     resyncPush();
+    checkVersion();
   }
   render();
   loadBoard();
   loadHome();
+  loadLists();
+}
+
+// New version on GitHub? Offer a one-tap refresh (phones otherwise cache for a while).
+async function checkVersion() {
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const { version } = await r.json();
+    if (version && String(version) !== APP_VERSION && !$('#updateBar')) {
+      const bar = document.createElement('div');
+      bar.id = 'updateBar';
+      bar.innerHTML = `<span>A new version of One Thing is ready.</span><button>Refresh</button>`;
+      bar.querySelector('button').onclick = () => location.replace(location.pathname + '?v=' + encodeURIComponent(version));
+      document.body.appendChild(bar);
+    }
+  } catch { /* offline: try again later */ }
 }
 
 function render() {
   document.querySelectorAll('#tabs [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
   document.body.dataset.tab = S.tab;
   renderScene();
+  $('#fab').hidden = S.tab === 'add' || S.tab === 'settings';
+  if (S.tab !== 'today') S.pauseOpen = null;
   if (S.tab === 'today') { renderToday(); loadBoard(); }
   else if (S.tab === 'home') { renderHome(); loadHome(); }
+  else if (S.tab === 'lists') { renderLists(); loadLists(); }
   else if (S.tab === 'add') renderAdd();
   else if (S.tab === 'store') { renderStore(); loadHome(); }
-  else renderMore();
+  else if (S.tab === 'all') renderAll();
+  else renderSettings();
 }
 
 // The room behind the Today screen.
@@ -248,7 +287,8 @@ async function loadBoard() {
   if (error) { console.warn(error); return; }
   S.board = data;
   S.status.names = data.names;
-  if (S.tab === 'today') renderToday();
+  S.clockSkew = new Date(data.now).getTime() - Date.now();
+  if (S.tab === 'today' && !S.pauseOpen) renderToday();
 }
 
 async function loadHome() {
@@ -260,7 +300,7 @@ async function loadHome() {
   // Keep every Stars / level badge on screen current, whatever the tab.
   document.querySelectorAll('.stars').forEach((e) => { e.querySelector('span').textContent = data.stars; e.setAttribute('aria-label', `${data.stars} Stars`); });
   document.querySelectorAll('.lvl').forEach((e) => { e.textContent = `Lv ${data.level}`; });
-  if (S.tab === 'today') { renderScene(); renderToday(); }
+  if (S.tab === 'today') { renderScene(); if (!S.pauseOpen) renderToday(); }
   else if (S.tab === 'home') renderHome();
   else if (S.tab === 'store') renderStore();
   // A level-up this device hasn't celebrated yet (maybe your partner earned it).
@@ -279,13 +319,90 @@ function renderToday() {
   main().innerHTML = `
     ${header(esc(fmtDay(b.day, { weekday: 'long', month: 'long', day: 'numeric' })), 'Today')}
     ${showInstall ? `<div class="banner">To get notifications, tap <b>Share</b> → <b>Add to Home Screen</b>, then open One Thing from your home screen. <button data-act="hideInstall" class="link">Hide</button></div>` : ''}
+    ${togetherBlock(b.together)}
     <section class="cards">${order.map((p, i) => card(p, b[p], b.day, i)).join('')}</section>
     ${b.week_done ? `<p class="weekdone"><b>${b.week_done}</b> done together this week</p>` : ''}`;
+  tickTimer();
+  const ta = $('#pauseNote'); if (ta && S.pauseDraft?.focus) { ta.focus(); S.pauseDraft.focus = false; }
+}
+
+// ----- Do ours together -----
+function togetherBlock(tg) {
+  if (!tg) return '';
+  const meP = me();
+  if (tg.status === 'running') {
+    return `
+    <section class="together running" aria-label="Doing it together">
+      <div class="ring"><svg viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="48" class="ring-bg"/><circle id="tgRing" cx="56" cy="56" r="48" class="ring-fg" stroke-dasharray="301.6" stroke-dashoffset="0" transform="rotate(-90 56 56)"/></svg>
+        <div class="ring-text"><div id="tgClock" class="clock">25:00</div><div class="of">of 25 min</div></div></div>
+      <div class="tg-body">
+        <div class="tg-title">Doing it together</div>
+        <div class="tg-who"><span class="who p1">${esc(nameOf('p1'))} · in</span><span class="who p2">${esc(nameOf('p2'))} · in</span></div>
+        <div class="tg-bonus">${tg.bonus_paid ? 'Bonus earned: <b>+5 Stars each</b>' : 'Both finish before it ends: <b>+5 bonus Stars each</b>'}</div>
+        <button class="link light" data-act="tgEnd">End early</button>
+      </div>
+    </section>`;
+  }
+  if (tg.status === 'invited') {
+    if (tg.started_by === meP) return `<section class="together invite"><div>Waiting for ${esc(nameOf(other(meP)))} to join…</div><button class="link light" data-act="tgEnd">Cancel</button></section>`;
+    if (isPerson(meP)) return `<section class="together invite"><div><b>${esc(nameOf(tg.started_by))}</b> wants to do tasks together. 25 minutes, bonus Stars if you both finish.</div>
+      <div class="row-buttons"><button class="primary" data-act="tgJoin">Join</button><button class="ghost light" data-act="tgEnd">Not now</button></div></section>`;
+    return `<section class="together invite"><div>${esc(nameOf(tg.started_by))} invited ${esc(nameOf(other(tg.started_by)))} to do tasks together.</div></section>`;
+  }
+  return isPerson(meP) ? `<button class="together-start" data-act="tgStart">${ICON.people}<span>Do ours together</span></button>` : '';
+}
+
+function tickTimer() {
+  const tg = S.board?.together;
+  const clock = $('#tgClock'); if (!clock || !tg || tg.status !== 'running') return;
+  const left = Math.max(0, new Date(tg.ends_at).getTime() - (Date.now() + (S.clockSkew || 0)));
+  const m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
+  clock.textContent = `${m}:${String(sec).padStart(2, '0')}`;
+  const ring = $('#tgRing'); if (ring) ring.setAttribute('stroke-dashoffset', String(301.6 * (1 - left / (25 * 60000))));
+  if (left === 0 && !S.timerEnded) { S.timerEnded = true; toast('Time! Nice work, you two.'); setTimeout(() => { S.timerEnded = false; loadBoard(); }, 1500); }
+}
+
+// ----- Pause panel -----
+function addDays(dayStr, n) { const d = parseDay(dayStr); d.setDate(d.getDate() + n); return localISO(d); }
+function pauseUntil(draft, day) {
+  if (draft.until === '2d') return addDays(day, 2);
+  if (draft.until === 'week') return addDays(day, 7);
+  if (draft.until === 'date' && draft.date) return draft.date;
+  return addDays(day, 1);
+}
+function pausePanel(p, t, day) {
+  const d = S.pauseDraft;
+  const until = pauseUntil(d, day);
+  const short = (iso) => fmtDay(iso, { weekday: 'short' });
+  const opt = (k, label) => `<button type="button" role="radio" aria-checked="${d.until === k}" class="${d.until === k ? 'on' : ''}" data-act="pauseUntil" data-k="${k}">${label}</button>`;
+  const warn = t.due_date && until > t.due_date
+    ? `<div class="warn" role="alert">Heads up: it's due ${esc(fmtDay(t.due_date))}, and ${esc(fmtDay(until))} is after that. You can still go ahead.</div>` : '';
+  return `
+  <section class="pause-panel" aria-label="Pause this task">
+    <div class="pp-title">${ICON.pause}Pause for now</div>
+    <label>Where did you leave off?
+      <textarea id="pauseNote" rows="2" placeholder="e.g. top two shelves done, paint cans next">${esc(d.note)}</textarea></label>
+    <div class="pp-hint">${STAR}+3 Stars for a progress note</div>
+    <div class="pp-label">Come back on</div>
+    <div class="pp-dates" role="radiogroup" aria-label="Come back on">
+      ${opt('1d', 'Tomorrow')}${opt('2d', 'In 2 days')}${opt('week', `Next week · ${esc(short(addDays(day, 7)))}`)}
+      <label class="pick ${d.until === 'date' ? 'on' : ''}">${ICON.cal}<span>${d.until === 'date' && d.date ? esc(fmtDay(d.date)) : 'Pick a date'}</span>
+        <input type="date" id="pauseDate" min="${addDays(day, 1)}" value="${esc(d.date || '')}" aria-label="Pick a date"></label>
+    </div>
+    ${warn}
+    <label class="switch-row"><span>Give me a new task now<small>Doesn't use your swap</small></span>
+      <input type="checkbox" id="pauseReplace" ${d.replace ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>
+    <div class="row-buttons">
+      <button class="ghost" data-act="pauseCancel">Cancel</button>
+      <button class="btn-blue" data-act="pauseGo" data-p="${p}" data-id="${t.id}">Pause till ${esc(short(until))}</button>
+    </div>
+  </section>`;
 }
 
 function card(p, c, day, i) {
-  const open = c.items.filter((t) => t.kind !== 'done');
+  const open = c.items.filter((t) => t.kind !== 'done' && t.kind !== 'paused');
   const done = c.items.filter((t) => t.kind === 'done');
+  const paused = c.items.filter((t) => t.kind === 'paused');
   let footer = '';
   if (c.can_another) footer = `<button class="another" data-act="another" data-p="${p}">${done.length ? 'Give me another' : 'Give me one'}</button>`;
   else if (!open.length && done.length) footer = `<div class="clear">Done for today</div>`;
@@ -298,6 +415,7 @@ function card(p, c, day, i) {
       <span class="chip ${c.swap_used ? 'used' : ''}">${c.swap_used ? 'Swap used' : '1 swap left'}</span>
     </div>
     ${open.map((t) => taskRow(p, t, c, day)).join('')}
+    ${paused.map((t) => pausedRow(p, t)).join('')}
     ${done.map((t) => doneRow(t)).join('')}
     ${footer}
   </article>`;
@@ -306,35 +424,43 @@ function card(p, c, day, i) {
 function taskRow(p, t, c, day) {
   const notes = t.progress_notes || [];
   const last = notes[notes.length - 1];
-  const pausedToday = t.paused_day === day;
   const inProgress = notes.length > 0;
+  const panelOpen = S.pauseOpen === t.id;
   const badges = [
     t.priority === 2 ? `<span class="badge red">High</span>` : '',
     dueLabel(t.due_date, day),
     t.owner === 'both' ? `<span class="badge blue">Together</span>` : '',
-    pausedToday ? `<span class="badge blue">Paused for today</span>` : inProgress ? `<span class="badge blue">In progress</span>` : '',
+    inProgress ? `<span class="badge blue">In progress</span>` : '',
     t.kind === 'pick' && t.days >= 1 && !inProgress ? `<span class="badge">Day ${t.days + 1}</span>` : '',
   ].join('');
-  const canSwap = !c.swap_used && t.kind !== 'shared' && !pausedToday;
+  const canSwap = !c.swap_used && t.kind !== 'shared';
   const nudge = t.kind === 'pick' && t.days >= 3 && !inProgress
     ? `<div class="nudge">This one's been here ${t.days + 1} days. Too big?
          <button class="link" data-act="split" data-p="${p}" data-id="${t.id}" data-title="${esc(t.title)}">Break it into a smaller first step</button></div>`
     : '';
   const data = `data-p="${p}" data-id="${t.id}" data-title="${esc(t.title)}"`;
   return `
-  <div class="task ${t.kind} ${pausedToday ? 'paused' : ''}">
+  <div class="task ${t.kind}">
     <div class="title">${esc(t.title)}</div>
     ${badges ? `<div class="badges">${badges}</div>` : ''}
     ${last ? `<div class="leftoff"><b>Left off:</b> ${esc(last.note)}</div>` : ''}
     ${t.notes ? `<div class="notes">${esc(t.notes)}</div>` : ''}
     ${nudge}
+    ${panelOpen ? pausePanel(p, t, day) : `
     <div class="actions">
       <button class="btn-done" data-act="done" ${data}>${ICON.check}<span>Done</span></button>
-      ${pausedToday
-        ? `<button class="btn-soft" data-act="resume" ${data}>Resume</button>`
-        : `<button class="btn-pause" aria-label="Pause and note where you left off" data-act="pause" ${data}>${ICON.pause}</button>
-           <button class="btn-swap" aria-label="Not today (uses your swap)" data-act="swap" ${data} ${canSwap ? '' : 'disabled'}>${ICON.cross}</button>`}
-    </div>
+      <button class="btn-pause" aria-label="Pause: note where you left off and pick a day to come back" aria-expanded="false" data-act="pause" ${data}>${ICON.pause}</button>
+      <button class="btn-swap" aria-label="Not today (uses your swap)" data-act="swap" ${data} ${canSwap ? '' : 'disabled'}>${ICON.cross}</button>
+    </div>`}
+  </div>`;
+}
+
+function pausedRow(p, t) {
+  return `
+  <div class="task paused-row">
+    <span class="pausemark" aria-hidden="true">${ICON.pause}</span>
+    <div class="title">${esc(t.title)}<span class="back">Back ${esc(fmtDay(t.not_before))}</span></div>
+    <button class="link small" data-act="resume" data-p="${p}" data-id="${t.id}">Undo</button>
   </div>`;
 }
 
@@ -353,11 +479,14 @@ async function onMainClick(e) {
 
   if (act === 'hideInstall') { store.set('hideInstall', '1'); return renderToday(); }
 
+  if (act === 'settings') { S.tab = 'settings'; return render(); }
+
   if (act === 'done') {
     b.disabled = true;
     const r = await rpc('complete_task', { p_task: id, p_by: p });
     if (!r) return;
     if (r.award) celebrate(`+${r.award} Stars!`, b);
+    if (r.together_bonus) setTimeout(() => celebrate('+5 each: together bonus!', $('.together') || b), 700);
     S.board = r; renderToday();
     let undone = false;
     toast('Nice. Crossed off ✓', { label: 'Undo', run: async () => {
@@ -373,15 +502,35 @@ async function onMainClick(e) {
   }
 
   if (act === 'pause') {
-    const note = prompt(`Pausing "${title}" for today.\n\nWhere did you leave off? (optional)`);
-    if (note === null) return;
-    const r = await rpc('pause_task', { p, p_task: id, p_note: note });
-    if (r) { S.board = r; renderToday(); toast('Paused. It\'ll be back tomorrow with your note.'); }
+    S.pauseOpen = id; S.pauseDraft = { note: '', until: '1d', date: '', replace: true, focus: true };
+    return renderToday();
+  }
+  if (act === 'pauseUntil') { syncPauseDraft(); S.pauseDraft.until = b.dataset.k; return renderToday(); }
+  if (act === 'pauseCancel') { S.pauseOpen = null; S.pauseDraft = null; return renderToday(); }
+  if (act === 'pauseGo') {
+    syncPauseDraft();
+    const d = S.pauseDraft; const until = pauseUntil(d, S.board.day);
+    b.disabled = true;
+    const r = await rpc('pause_task', { p, p_task: id, p_note: d.note, p_until: until, p_replace: d.replace });
+    S.pauseOpen = null; S.pauseDraft = null;
+    if (!r) return renderToday();
+    S.board = r; renderToday();
+    if (r.award) celebrate(`+${r.award} Stars!`, $('.paused-row') || $('.cards'));
+    toast(`Paused. Back ${fmtDay(r.back, { weekday: 'long' })}${d.note.trim() ? ' with your note' : ''}.`);
+    loadHome();
   }
 
   if (act === 'resume') {
-    const r = await rpc('resume_task', { p_task: id }); if (r) { S.board = r; renderToday(); }
+    const r = await rpc('resume_task', { p, p_task: id }); if (r) { S.board = r; renderToday(); toast('Unpaused'); }
   }
+
+  if (act === 'tgStart') {
+    const r = await rpc('start_together', { p: me() }); if (!r) return;
+    S.board = r; renderToday(); notify({ event: 'together_invite' });
+    toast(`Invite sent to ${nameOf(other(me()))}`);
+  }
+  if (act === 'tgJoin') { const r = await rpc('join_together', { p: me() }); if (r) { S.board = r; renderToday(); toast('Timer started. You got this.'); } }
+  if (act === 'tgEnd') { const r = await rpc('end_together'); if (r) { S.board = r; renderToday(); } }
 
   if (act === 'swap') {
     if (!confirm(`Not today for "${title}"?\n\nThis uses ${nameOf(p)}'s one swap for today. It goes back in the pile for another day.`)) return;
@@ -398,6 +547,8 @@ async function onMainClick(e) {
     const r = await rpc('split_task', { p, p_task: id, p_title: step.trim() });
     if (r) { S.board = r; renderToday(); toast('Smaller step is on your card. The big one waits in the list.'); }
   }
+
+  if (['listTab', 'usualAdd', 'usualHide', 'shopTick', 'shopEdit', 'listReady', 'finishTrip'].includes(act)) return onListClick(act, b);
 
   // Home: tap a spot
   if (act === 'spot') openSpot(b.dataset.spot);
@@ -462,6 +613,10 @@ function renderHome() {
         : `<div class="next"><span>Every level reward earned. New rooms are coming in a future update.</span></div>`}
     </section>
     <div class="row-buttons home-actions">
+      <button class="btn-soft" data-act="spot" data-spot="wallpaper">Wallpaper</button>
+      <button class="btn-soft" data-act="spot" data-spot="floor">Floor</button>
+    </div>
+    <div class="row-buttons home-actions">
       <button class="btn-soft" data-act="storage">Storage (${stored.length})</button>
       <button class="btn-soft" data-act="goStore">Visit the Store</button>
     </div>`;
@@ -474,7 +629,7 @@ function ownedLine(o, actions) {
 
 function openSpot(spot) {
   const h = S.home; if (!h) return;
-  const s = SPOTS[spot];
+  const s = allSpots()[spot];
   const current = h.owned.find((o) => o.spot === spot);
   const stored = h.owned.filter((o) => !o.spot && o.item_spot === spot);
   const d = $('#sheet');
@@ -482,7 +637,7 @@ function openSpot(spot) {
     <div class="stack">
       <h2>${esc(s.label)}</h2>
       ${current ? ownedLine(current, `<button class="btn-soft small" data-sheet="store" data-id="${current.id}">To Storage</button>`)
-        : `<p class="muted">Nothing here yet.</p>`}
+        : `<p class="muted">${STYLE_SPOTS[spot] ? 'The original look. Find new ones in the Store under Walls & floors.' : 'Nothing here yet.'}</p>`}
       ${stored.length ? `<h3>In Storage</h3>${stored.map((o) => ownedLine(o, `<button class="btn-soft small" data-sheet="place" data-id="${o.id}">Put here</button>`)).join('')}` : ''}
       <div class="row-buttons">
         <button class="primary" data-sheet="shop">Shop for this spot</button>
@@ -521,15 +676,16 @@ function openStorage() {
 }
 
 // ---------- Store ------------------------------------------------------------
-const CATS = { all: 'All', furniture: 'Furniture', plants: 'Plants', decor: 'Decor', lighting: 'Lighting', rugs: 'Rugs' };
+const CATS = { all: 'All', limited: 'Limited', furniture: 'Furniture', plants: 'Plants', decor: 'Decor', lighting: 'Lighting', rugs: 'Rugs', walls: 'Walls & floors' };
 
 function renderStore() {
   const h = S.home;
   if (!h) { main().innerHTML = `${header('New stock every Monday', 'Store')}<div class="center muted">Loading…</div>`; return; }
   const days = h.restock_in;
-  const cats = ['all', ...Object.keys(CATS).filter((c) => c !== 'all' && h.stock.some((i) => i.category === c))];
+  const cats = ['all', ...Object.keys(CATS).filter((c) => c !== 'all' && h.stock.some((i) => (c === 'limited' ? i.season : i.category === c)))];
   let items = h.stock;
   if (S.storeSpot) items = items.filter((i) => i.spot === S.storeSpot);
+  else if (S.storeCat === 'limited') items = items.filter((i) => i.season);
   else if (S.storeCat !== 'all') items = items.filter((i) => i.category === S.storeCat);
   const featured = h.stock.filter((i) => !i.owned && i.min_level <= h.level).sort((a, b) => b.price - a.price)[0];
   const placed = (id) => h.owned.find((o) => o.item_id === id)?.spot;
@@ -542,7 +698,7 @@ function renderStore() {
     else btn = `<button class="buy" data-act="buy" data-item="${i.id}">Buy · ${STAR}${i.price}</button>`;
     return `
       <article class="item">
-        <div class="item-art">${itemThumb(i.id, i.spot)}</div>
+        <div class="item-art">${i.season ? `<span class="limited">Limited · ${esc(i.season)}</span>` : ''}${itemThumb(i.id, i.spot)}</div>
         <div class="item-name">${esc(i.name)}</div>
         <div class="item-price">${STAR}${i.price}</div>
         ${btn}
@@ -552,7 +708,7 @@ function renderStore() {
   main().innerHTML = `
     ${header(`New stock every Monday · ${days === 1 ? '1 day' : days + ' days'} left`, 'Store')}
     <div class="cats" role="tablist" aria-label="Categories">
-      ${S.storeSpot ? `<button class="cat on" data-act="clearSpot">For: ${esc(SPOTS[S.storeSpot].label)} ✕</button>`
+      ${S.storeSpot ? `<button class="cat on" data-act="clearSpot">For: ${esc(allSpots()[S.storeSpot].label)} ✕</button>`
         : cats.map((c) => `<button class="cat ${S.storeCat === c ? 'on' : ''}" role="tab" aria-selected="${S.storeCat === c}" data-act="cat" data-cat="${c}">${CATS[c]}</button>`).join('')}
     </div>
     ${featured && !S.storeSpot && S.storeCat === 'all' ? `
@@ -571,7 +727,7 @@ function renderStore() {
 async function buy(itemId, btn) {
   const h = S.home; const i = h.stock.find((x) => x.id === itemId); if (!i) return;
   const occupant = h.owned.find((o) => o.spot === i.spot);
-  const where = occupant ? `\n\nIt goes where the ${occupant.name} is now — the ${occupant.name} moves to Storage.` : `\n\nIt goes in the ${SPOTS[i.spot].label.toLowerCase()}.`;
+  const where = occupant ? `\n\nIt replaces the ${occupant.name}, which moves to Storage.` : `\n\nIt goes in the ${allSpots()[i.spot].label.toLowerCase()}.`;
   if (!confirm(`Buy ${i.name} for ${i.price} Stars?${where}`)) return;
   const by = isPerson(me()) ? me() : 'wall';
   const r = await rpc('buy_item', { p_item: itemId, p_by: by });
@@ -642,22 +798,167 @@ function renderAdd() {
   };
 }
 
-// ---------- More: all tasks + settings --------------------------------------
-function renderMore() {
-  main().innerHTML = `
-    ${header('Everything else', 'More')}
-    <div class="seg wide" id="moreSeg">
-      <button class="${S.moreTab === 'all' ? 'on' : ''}" data-m="all">All tasks</button>
-      <button class="${S.moreTab === 'settings' ? 'on' : ''}" data-m="settings">Settings</button>
-    </div>
-    <div id="moreBody"></div>`;
-  $('#moreSeg').onclick = (e) => { const b = e.target.closest('[data-m]'); if (!b) return; S.moreTab = b.dataset.m; renderMore(); };
-  if (S.moreTab === 'all') renderAll(); else renderSettings();
+
+// ---------- Shopping lists ------------------------------------------------------
+const LISTS = { groceries: 'Groceries', household: 'Household' };
+
+async function loadLists() {
+  if (!S.status?.member) return;
+  const { data, error } = await sb.rpc('get_lists');
+  if (error) { console.warn(error); return; }
+  S.lists = data;
+  if (S.tab === 'lists' && document.activeElement?.id !== 'shopInput') renderLists();
+  else if (S.tab === 'lists') renderListBody();
 }
 
-async function renderAll() {
-  const body = $('#moreBody'); if (!body) return;
+function tripStars(n) { return (S.lists?.trips_today ?? 0) >= 2 ? 0 : Math.min(30, 10 + n); }
+
+function renderLists() {
+  const L = S.lists;
+  main().innerHTML = `
+    ${header(`Shared with ${esc(nameOf(isPerson(me()) ? other(me()) : 'p2'))}`, 'Lists')}
+    <div class="seg wide" role="tablist" aria-label="Lists" id="listSeg">
+      ${Object.entries(LISTS).map(([k, label]) => {
+        const n = L ? L.lists[k].items.filter((i) => !i.checked_at).length : 0;
+        return `<button role="tab" aria-selected="${S.list === k}" class="${S.list === k ? 'on' : ''}" data-act="listTab" data-list="${k}">${label}${n ? ` <span class="muted">· ${n}</span>` : ''}</button>`;
+      }).join('')}
+    </div>
+    <form class="panel add-shop" id="shopForm">
+      <div class="add-row">
+        <label class="sr" for="shopInput">Add items</label>
+        <input id="shopInput" autocomplete="off" enterkeyhint="done" placeholder="milk, eggs, 2 avocados…" value="${esc(S.listInput)}">
+        <button class="primary" type="submit">Add</button>
+      </div>
+      <div class="usual" id="usual"></div>
+    </form>
+    <div id="listBody">${L ? '' : '<div class="center muted">Loading…</div>'}</div>`;
+  $('#shopForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const text = $('#shopInput').value.trim(); if (!text) return;
+    const r = await rpc('add_shop_items', { p_list: S.list, p_text: text, p_by: isPerson(me()) ? me() : 'wall' });
+    if (!r) return;
+    S.lists = r; S.listInput = '';
+    renderLists(); $('#shopInput')?.focus();
+    if (r.added === 0) toast('Already on the list');
+    if (S.list === 'groceries') loadBoard();
+  };
+  renderListBody();
+}
+
+function renderUsual() {
+  const box = $('#usual'); if (!box || !S.lists) return;
+  const typed = S.listInput.trim().toLowerCase();
+  let chips = S.lists.lists[S.list].usual;
+  chips = typed ? chips.filter((u) => u.key.includes(typed)) : chips;
+  chips = chips.slice(0, 8);
+  box.innerHTML = chips.length ? `<span class="usual-label">Usual</span>` + chips.map((u) => `
+    <span class="chip-usual"><button type="button" data-act="usualAdd" data-name="${esc(u.name)}">+ ${esc(u.name)}</button><button type="button" class="x" aria-label="Stop suggesting ${esc(u.name)}" data-act="usualHide" data-key="${esc(u.key)}">✕</button></span>`).join('') : '';
+}
+
+function renderListBody() {
+  renderUsual();
+  const body = $('#listBody'); if (!body || !S.lists) return;
+  const items = S.lists.lists[S.list].items;
+  const open = items.filter((i) => !i.checked_at);
+  const got = items.filter((i) => i.checked_at);
+  const who = (p) => isPerson(p) ? `<span class="who-dot ${p}" title="Added by ${esc(nameOf(p))}">${esc(nameOf(p)[0] || '?')}</span>` : '';
+  const row = (i) => `
+    <li class="shop-row ${i.checked_at ? 'got' : ''}">
+      <button class="tick" aria-label="${i.checked_at ? 'Put back' : 'Got it'}: ${esc(i.name)}" data-act="shopTick" data-id="${i.id}">${i.checked_at ? ICON.check : ''}</button>
+      <button class="shop-name" data-act="shopEdit" data-id="${i.id}">
+        <span>${esc(i.name)}${i.qty ? ` <span class="qty">×${esc(i.qty)}</span>` : ''}</span>
+        ${i.note ? `<span class="shop-note">${esc(i.note)}</span>` : ''}
+      </button>
+      ${who(i.added_by)}
+    </li>`;
+  const n = got.length; const st = tripStars(n);
   body.innerHTML = `
+    ${open.length || got.length ? `<button class="ready-btn" data-act="listReady">${ICON.bell}<span>List is ready — tell ${esc(nameOf(isPerson(me()) ? other(me()) : 'p2'))}</span></button>` : ''}
+    ${S.list === 'groceries' && S.lists.order_task_open ? `<div class="order-note">8+ items: <b>Order groceries</b> is on both your cards.</div>` : ''}
+    ${items.length ? `<ul class="shop-list">
+      ${open.map(row).join('')}
+      ${got.length ? `<li class="cart-label">In the cart · ${got.length}</li>${got.map(row).join('')}` : ''}
+    </ul>` : `<p class="center muted">Nothing on the ${LISTS[S.list]} list. Add things above — separate several with commas.</p>`}
+    ${n ? `<button class="finish-btn" data-act="finishTrip">Got everything · ${STAR}${st ? '+' + st : 'no more Stars today'}</button>` : ''}`;
+}
+
+function openShopEdit(item) {
+  const d = $('#editDialog');
+  d.innerHTML = `
+  <form method="dialog" class="stack" id="shopEditForm">
+    <h2>Edit item</h2>
+    <label>Item<input name="name" required value="${esc(item.name)}"></label>
+    <div class="two">
+      <label>Quantity<input name="qty" value="${esc(item.qty ?? '')}" placeholder="e.g. 2"></label>
+      <label>Note<input name="note" value="${esc(item.note ?? '')}" placeholder="e.g. ripe ones"></label>
+    </div>
+    <div class="row-buttons">
+      <button class="primary" value="save">Save</button>
+      <button value="delete" class="danger" formnovalidate>Remove</button>
+    </div>
+    <button value="cancel" class="ghost" formnovalidate>Cancel</button>
+  </form>`;
+  d.showModal();
+  d.onclose = async () => {
+    const action = d.returnValue; d.returnValue = '';
+    const f = new FormData($('#shopEditForm'));
+    if (action === 'save') {
+      const upd = { name: String(f.get('name')).trim(), qty: String(f.get('qty') || '').trim() || null, note: String(f.get('note') || '').trim() || null };
+      if (!upd.name) return;
+      const { error } = await sb.from('shop_items').update(upd).eq('id', item.id);
+      if (error) return toast(error.message);
+    } else if (action === 'delete') {
+      const { error } = await sb.from('shop_items').delete().eq('id', item.id);
+      if (error) return toast(error.message);
+    } else return;
+    loadLists();
+  };
+}
+
+async function onListClick(act, b) {
+  const by = isPerson(me()) ? me() : 'wall';
+  if (act === 'listTab') { S.list = b.dataset.list; S.listInput = ''; return renderLists(); }
+  if (act === 'usualAdd') {
+    const r = await rpc('add_shop_items', { p_list: S.list, p_text: b.dataset.name, p_by: by });
+    if (r) { S.lists = r; S.listInput = ''; renderLists(); }
+  }
+  if (act === 'usualHide') { const r = await rpc('hide_usual', { p_list: S.list, p_key: b.dataset.key }); if (r) { S.lists = r; renderListBody(); } }
+  if (act === 'shopTick') { const r = await rpc('toggle_shop_item', { p_id: b.dataset.id, p_by: by }); if (r) { S.lists = r; renderListBody(); } }
+  if (act === 'shopEdit') { const it = S.lists.lists[S.list].items.find((i) => i.id === b.dataset.id); if (it) openShopEdit(it); }
+  if (act === 'listReady') {
+    notify({ event: 'list_ready', list: S.list });
+    toast(`Told ${nameOf(isPerson(me()) ? other(me()) : 'p2')} the ${LISTS[S.list]} list is ready`);
+  }
+  if (act === 'finishTrip') {
+    const n = S.lists.lists[S.list].items.filter((i) => i.checked_at).length;
+    if (!confirm(`Got all ${n} ticked item${n === 1 ? '' : 's'}?\n\nThey'll come off the list${tripStars(n) ? ` and you'll earn ${tripStars(n)} Stars` : ''}. Anything not ticked stays on.`)) return;
+    const r = await rpc('finish_trip', { p_list: S.list, p_by: by }); if (!r) return;
+    S.lists = r; renderLists();
+    celebrate(r.award ? `+${r.award} Stars!` : 'All done!', $('#listBody'));
+    if (isPerson(me())) notify({ event: 'trip_done', list: S.list, items: r.items, stars: r.award });
+    loadHome(); loadBoard();
+  }
+}
+
+// Typing in the pause note / list box shouldn't lose what you typed on refresh.
+function syncPauseDraft() {
+  if (!S.pauseDraft) return;
+  const n = $('#pauseNote'); if (n) S.pauseDraft.note = n.value;
+  const r = $('#pauseReplace'); if (r) S.pauseDraft.replace = r.checked;
+}
+function onMainInput(e) {
+  const t = e.target;
+  if (t.id === 'pauseNote') S.pauseDraft && (S.pauseDraft.note = t.value);
+  if (t.id === 'pauseReplace') S.pauseDraft && (S.pauseDraft.replace = t.checked);
+  if (t.id === 'pauseDate' && e.type === 'change' && t.value) { syncPauseDraft(); S.pauseDraft.until = 'date'; S.pauseDraft.date = t.value; renderToday(); }
+  if (t.id === 'shopInput') { S.listInput = t.value; renderUsual(); }
+}
+
+// ---------- All tasks ----------------------------------------------------------
+async function renderAll() {
+  const body = main();
+  body.innerHTML = `
+    ${header('Everything on your lists', 'All tasks')}
     <div class="seg small" id="allSeg">
       <button class="${S.allFilter === 'open' ? 'on' : ''}" data-f="open">To do</button>
       <button class="${S.allFilter === 'done' ? 'on' : ''}" data-f="done">Done</button>
@@ -755,12 +1056,12 @@ function openEdit(t) {
       toast('Deleted');
     } else return;
     loadBoard();
-    if (S.tab === 'more' && S.moreTab === 'all') renderAll();
+    if (S.tab === 'all') renderAll();
   };
 }
 
 function renderSettings() {
-  const body = $('#moreBody'); if (!body) return;
+  const body = main();
   const p = me();
   const pref = isPerson(p) ? S.status.add_pref?.[p] ?? 'all' : null;
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
@@ -782,6 +1083,7 @@ function renderSettings() {
       </select></label>`;
 
   body.innerHTML = `
+  ${header('Your household', 'Settings')}
   <div class="panel stack">
     <h2>This device</h2>
     <p>Belongs to <b>${esc(p === 'shared' ? 'the shared screen' : nameOf(p))}</b>. <button class="link" id="changeWho">Change</button></p>
@@ -809,7 +1111,7 @@ function renderSettings() {
     <label>New passcode<input type="password" name="new" minlength="6" required autocomplete="new-password"></label>
     <button>Change passcode</button>
   </form>
-  <p class="center muted small">One Thing · Our Home update</p>`;
+  <p class="center muted small">One Thing · version ${APP_VERSION}</p>`;
 
   $('#changeWho').onclick = () => renderWho(false);
   $('#pushOn')?.addEventListener('click', enablePush);
