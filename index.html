@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>One Thing</title>
+  <meta name="description" content="One task each, every day.">
+  <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171614" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="One Thing">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <main id="main"><div class="center muted">Loading…</div></main>
+    <nav id="tabs" hidden>
+      <button data-tab="today"><span class="ico">◉</span>Today</button>
+      <button data-tab="add"><span class="ico">＋</span>Add</button>
+      <button data-tab="all"><span class="ico">☰</span>All</button>
+      <button data-tab="settings"><span class="ico">⚙︎</span>Settings</button>
+    </nav>
+  </div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="editDialog"></dialog>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
