@@ -16,6 +16,7 @@ One task each, every day. A shared to-do app for two people with ADHD: you can d
   - **✓** = done (with a few seconds to undo). **✗** = "not today," which uses your **one swap per day**. The task goes back in the pile.
   - After you finish, **Give me another** gives you one more.
   - After 3 days on your card, a task offers to be **broken into a smaller first step**.
+- **Our Home:** every task earns Stars and XP. Levels add furniture to a shared room, and the Store (8 items, new every Monday) lets you pick more. **Pause** (⏸) saves a "left off" note without using your swap. See `UPGRADE.md` for the full table.
 - **Notifications:**
   - 7 a.m.: your task(s) for today.
   - 7 p.m.: only if something's still open.
@@ -40,6 +41,7 @@ You need a computer for steps 1–8 (any computer with a web browser), then your
 1. Left sidebar → **SQL Editor** → **New query**.
 2. Open `supabase/schema.sql` from this folder, copy **everything**, and paste it in.
 3. Click **Run**. You should see *Success. No rows returned.*
+4. Do the same with `supabase/002_our_home.sql` (the "Our Home" upgrade).
 
 ### 3. Make your notification keys
 
@@ -141,10 +143,12 @@ Change `morning` to `evening` to test the 7 p.m. one. You'll only get it if a ta
 
 ```
 index.html, styles.css, app.js   the app
+room.js                          the room and all furniture art
 config.js                        your Supabase + key settings (step 6)
 sw.js, manifest.webmanifest      make it installable + receive notifications
 icons/                           home-screen icon
 supabase/schema.sql              database setup (step 2)
+supabase/002_our_home.sql        Our Home upgrade: Stars, levels, Store (step 2.4)
 supabase/functions/notify/       notification sender (step 4)
 supabase/cron.sql                7 a.m. / 7 p.m. schedule (step 5)
 tools/make-keys.html             key generator (step 3)
@@ -153,4 +157,5 @@ tools/make-keys.html             key generator (step 3)
 ## Roadmap
 
 - **Phase 2: Raspberry Pi wall display.** Full-screen kiosk mode, always on, dims from 10 p.m. to 6 a.m. Same app, logged in as "Shared screen."
+- **Our Home, next:** weekly team goal (being designed), new rooms after level 10.
 - **Phase 3:** a Siri Shortcut ("Hey Siri, add to One Thing") and recurring tasks.
