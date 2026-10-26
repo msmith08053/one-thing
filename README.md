@@ -34,14 +34,14 @@ You need a computer for steps 1–8 (any computer with a web browser), then your
 1. Go to **supabase.com** → sign up → **New project**.
 2. Name it `one-thing`. Pick any strong database password (save it somewhere). For region, pick **East US**. Click **Create**, then wait about 2 minutes.
 3. Left sidebar → **Authentication** → **Sign In / Providers** (on some versions it's under *Settings*). Turn on **Allow anonymous sign-ins** → **Save**.
-   > This lets each phone get its own sign-in without email. Your **household passcode** (step 9) is what actually keeps strangers out.
+   > This lets each phone get its own sign-in without email. Your **household code** (step 9) is what actually keeps strangers out.
 
 ### 2. Load the database setup
 
 1. Left sidebar → **SQL Editor** → **New query**.
 2. Open `supabase/schema.sql` from this folder, copy **everything**, and paste it in.
 3. Click **Run**. You should see *Success. No rows returned.*
-4. Do the same with `supabase/002_our_home.sql`, then `supabase/003_lists_pause_together.sql` (in that order).
+4. Do the same with `supabase/002_our_home.sql`, then `003_lists_pause_together.sql`, then `004_households_pins.sql` (in that order).
 
 ### 3. Make your notification keys
 
@@ -96,12 +96,12 @@ Open that link. You should see **Set up your household**. If you see *Almost the
 1. Open the link in **Safari**.
 2. Tap **Share** (□↑) → **Add to Home Screen** → **Add**.
 3. Open **One Thing from the new home-screen icon.** This matters: iPhone only allows notifications from the icon, not from Safari.
-4. **Set up your household:** your name, her name, and a passcode (6+ characters, something you'll both remember).
+4. Tap **Start a household** and enter your name and your partner's. You'll get a **household code**. Save it somewhere, since it's also how you get back in on a new phone.
 5. Go to **Settings** → **Turn on notifications** → **Allow** → **Send a test**. You should get a notification within a few seconds.
 
 ### 10. Her iPhone
 
-Same as step 9, but tap **Join instead**, enter the passcode, then pick her name. Then turn on notifications and send a test.
+Same as step 9, but tap **I have a code**, enter the household code, then pick her name. Then turn on notifications and send a test.
 
 ### 11. Test the scheduled notifications (optional)
 
@@ -130,14 +130,14 @@ Change `morning` to `evening` to test the 7 p.m. one. You'll only get it if a ta
 | No 7 a.m. notification | Run the test in step 11. If that works, check SQL Editor: `select * from cron.job_run_details order by start_time desc limit 5;` |
 | Notifications stopped after a while | iOS occasionally drops web-app subscriptions. Open the app (it re-registers automatically). If that doesn't work, use Settings → Turn on notifications. |
 | Changed `config.js` but the phone still shows old values | Close the app fully (swipe up) and reopen it. |
-| "Too many wrong tries" | Someone entered the wrong passcode 20 times in an hour. Wait an hour. |
+| "Too many tries" | That device entered a wrong household code 10 times in an hour. Wait an hour. |
 
 ## Good to know
 
 - **Keep it alive:** Supabase's free tier pauses a project after 7 days with no use. Normal daily use prevents that, and in Phase 2 the always-on wall display guarantees it. If it ever pauses, click **Restore project** in Supabase.
 - **Backups:** Settings → **Export backup** saves all your tasks to a file. Do it once a month or so.
 - **Updating the app:** edit a file on GitHub (pencil icon) → **Commit**. On the phones, close and reopen the app.
-- **Privacy:** the app's code is public on GitHub, but your tasks aren't. Only devices that entered the household passcode can read or change them.
+- **Privacy:** the app's code is public on GitHub, but your tasks aren't. Only devices that joined with your household code can read or change them.
 
 ## Files
 
@@ -150,6 +150,7 @@ icons/                           home-screen icon
 supabase/schema.sql              database setup (step 2)
 supabase/002_our_home.sql        Our Home upgrade: Stars, levels, Store (step 2.4)
 supabase/003_lists_pause_together.sql  Lists, new Pause, together timer, seasonal + walls
+supabase/004_households_pins.sql Households + join codes, pins, fixes
 version.json                     tells phones a new version is out (bump it with each update)
 supabase/functions/notify/       notification sender (step 4)
 supabase/cron.sql                7 a.m. / 7 p.m. schedule (step 5)
@@ -160,6 +161,7 @@ tools/make-keys.html             key generator (step 3)
 
 - `UPGRADE.md`: Our Home (Stars, levels, Store)
 - `UPGRADE-v3.md`: Lists, new Pause, Do it together, seasonal items, walls & floors
+- `UPGRADE-v4.md`: households and codes, pins, How it works, new logo, fixes
 
 ## Roadmap
 

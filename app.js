@@ -1,9 +1,9 @@
 // One Thing — app logic (v3: Lists, new Pause, Do it together)
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { CONFIG } from './config.js';
-import { SPOTS, STYLE_SPOTS, roomSVG, itemThumb, isEvening } from './room.js?v=3';
+import { SPOTS, STYLE_SPOTS, roomSVG, itemThumb, isEvening } from './room.js?v=4';
 
-const APP_VERSION = '3';
+const APP_VERSION = '4';
 
 // ---------- Small helpers ----------------------------------------------------
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -19,6 +19,10 @@ const store = {
 const PRI = { 0: 'Low', 1: 'Normal', 2: 'High' };
 const STAR = `<svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z" fill="#F2B705" stroke="#C98F00" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
 const ICON = {
+  pin: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1 6 3 3H7l3-3z"/><path d="M12 12v9"/></svg>`,
+  pinFill: `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1 6 3 3H7l3-3z"/><path d="M12 12v9" fill="none"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`,
+  help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>`,
   check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>`,
   pause: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>`,
   cross: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
@@ -123,8 +127,7 @@ async function boot() {
     }
   }
   await refreshStatus();
-  if (!S.status.setup) return renderSetup();
-  if (!S.status.member) return renderJoin();
+  if (!S.status.member) return renderWelcome();
   startApp();
 }
 
@@ -145,44 +148,81 @@ async function notify(body) {
   try { await sb.functions.invoke('notify', { body }); } catch (e) { console.warn('notify failed', e); }
 }
 
-// ---------- First run: set up / join ----------------------------------------
+// ---------- First run: start or join a household -----------------------------
+function renderWelcome() {
+  main().innerHTML = `
+  <div class="panel welcome stack">
+    <img class="welcome-logo" src="icons/icon-192.png" alt="" width="84" height="84">
+    <h1>One Thing</h1>
+    <p class="lead">One task each, every day, and a home you build together.</p>
+    <button class="primary big" id="toStart">Start a household</button>
+    <button class="big" id="toJoin">I have a code</button>
+  </div>`;
+  $('#toStart').onclick = renderSetup;
+  $('#toJoin').onclick = renderJoin;
+}
+
 function renderSetup() {
   main().innerHTML = `
   <div class="panel welcome">
-    <h1>One Thing</h1>
-    <p class="lead">One task each, every day — and a home you build together.</p>
+    <h1>Start a household</h1>
     <form id="setupForm" class="stack">
-      <h2>Set up your household</h2>
       <label>Your name<input name="n1" required autocomplete="given-name"></label>
       <label>Your partner's name<input name="n2" required></label>
-      <label>Household passcode <span class="muted">(6+ characters; your partner uses it to join)</span>
-        <input name="pass" type="password" minlength="6" required autocomplete="new-password"></label>
       <button class="primary" type="submit">Create household</button>
     </form>
-    <p class="muted small">Already set up on another phone? <a href="#" id="toJoin">Join instead</a></p>
+    <p class="muted small"><a href="#" id="back">Back</a></p>
   </div>`;
-  $('#toJoin').onclick = (e) => { e.preventDefault(); renderJoin(); };
+  $('#back').onclick = (e) => { e.preventDefault(); renderWelcome(); };
   $('#setupForm').onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    const r = await rpc('setup_household', { p_passcode: f.get('pass'), p_name1: f.get('n1'), p_name2: f.get('n2'), p_me: 'p1' });
-    if (r) { S.status = r; startApp(); }
+    let tz = 'America/New_York'; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz; } catch { /* default */ }
+    const r = await rpc('create_household', { p_name1: f.get('n1'), p_name2: f.get('n2'), p_me: 'p1', p_tz: tz });
+    if (r) { S.status = r; renderCodeShare(true); }
   };
+}
+
+// Show the household code so the partner can join.
+function renderCodeShare(first) {
+  const code = S.status.code;
+  main().innerHTML = `
+  <div class="panel welcome stack center-text">
+    <h2>Your household code</h2>
+    <div class="code-big" aria-label="Code ${esc(code.split('').join(' '))}">${esc(code)}</div>
+    <p>${esc(nameOf('p2'))} opens One Thing, taps <b>I have a code</b>, and types this in. You can find it again anytime in Settings.</p>
+    <div class="row-buttons">
+      <button data-act-code="copy">${ICON.copy}<span>Copy</span></button>
+      ${navigator.share ? `<button data-act-code="share">Share</button>` : ''}
+    </div>
+    ${first ? `<button class="primary" id="codeNext">Next</button>` : ''}
+  </div>`;
+  main().querySelectorAll('[data-act-code]').forEach((b) => b.onclick = () => shareCode(b.dataset.actCode));
+  $('#codeNext')?.addEventListener('click', () => { startApp(); maybeTour(); });
+}
+async function shareCode(how) {
+  const code = S.status.code;
+  const text = `Join our One Thing household with this code: ${code}\n${location.origin + location.pathname}`;
+  try {
+    if (how === 'share' && navigator.share) await navigator.share({ title: 'One Thing', text });
+    else { await navigator.clipboard.writeText(code); toast('Code copied'); }
+  } catch { /* cancelled */ }
 }
 
 function renderJoin() {
   main().innerHTML = `
   <div class="panel welcome">
-    <h1>One Thing</h1>
+    <h1>Join a household</h1>
     <form id="joinForm" class="stack">
-      <h2>Join your household</h2>
-      <label>Household passcode<input name="pass" type="password" required autocomplete="current-password"></label>
+      <label>Household code<input name="code" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" class="code-input"></label>
       <button class="primary" type="submit">Join</button>
     </form>
+    <p class="muted small"><a href="#" id="back">Back</a></p>
   </div>`;
+  $('#back').onclick = (e) => { e.preventDefault(); renderWelcome(); };
   $('#joinForm').onsubmit = async (e) => {
     e.preventDefault();
-    const r = await rpc('join_household', { p_passcode: new FormData(e.target).get('pass'), p_person: 'shared' });
+    const r = await rpc('join_household', { p_passcode: new FormData(e.target).get('code'), p_person: 'shared' });
     if (r) { S.status = r; renderWho(true); }
   };
 }
@@ -197,7 +237,7 @@ function renderWho(first) {
   </div>`;
   main().querySelectorAll('[data-p]').forEach((b) => b.onclick = async () => {
     const r = await rpc('set_person', { p_person: b.dataset.p });
-    if (r) { S.status = r; first ? startApp() : (S.tab = 'settings', render()); }
+    if (r) { S.status = r; if (first) { startApp(); maybeTour(); } else { S.tab = 'settings'; render(); } }
   });
 }
 
@@ -263,7 +303,7 @@ function render() {
   document.querySelectorAll('#tabs [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
   document.body.dataset.tab = S.tab;
   renderScene();
-  $('#fab').hidden = S.tab === 'add' || S.tab === 'settings';
+  $('#fab').hidden = ['add', 'settings', 'help'].includes(S.tab);
   if (S.tab !== 'today') S.pauseOpen = null;
   if (S.tab === 'today') { renderToday(); loadBoard(); }
   else if (S.tab === 'home') { renderHome(); loadHome(); }
@@ -271,6 +311,7 @@ function render() {
   else if (S.tab === 'add') renderAdd();
   else if (S.tab === 'store') { renderStore(); loadHome(); }
   else if (S.tab === 'all') renderAll();
+  else if (S.tab === 'help') renderHelp();
   else renderSettings();
 }
 
@@ -400,9 +441,10 @@ function pausePanel(p, t, day) {
 }
 
 function card(p, c, day, i) {
-  const open = c.items.filter((t) => t.kind !== 'done' && t.kind !== 'paused');
+  const open = c.items.filter((t) => ['pinned', 'pick', 'shared'].includes(t.kind));
   const done = c.items.filter((t) => t.kind === 'done');
   const paused = c.items.filter((t) => t.kind === 'paused');
+  const due = c.items.filter((t) => t.kind === 'due');
   let footer = '';
   if (c.can_another) footer = `<button class="another" data-act="another" data-p="${p}">${done.length ? 'Give me another' : 'Give me one'}</button>`;
   else if (!open.length && done.length) footer = `<div class="clear">Done for today</div>`;
@@ -412,9 +454,10 @@ function card(p, c, day, i) {
     <span class="tape" aria-hidden="true"></span>
     <div class="card-head">
       <h2>${esc(nameOf(p))}</h2>
-      <span class="chip ${c.swap_used ? 'used' : ''}">${c.swap_used ? 'Swap used' : '1 swap left'}</span>
+      <span class="chips"><span class="chip pins" title="Pinned">${ICON.pin}${c.pin_count}/${c.pin_limit}</span><span class="chip ${c.swap_used ? 'used' : ''}">${c.swap_used ? 'Swap used' : '1 swap left'}</span></span>
     </div>
     ${open.map((t) => taskRow(p, t, c, day)).join('')}
+    ${due.length ? dueRows(p, due, c, day) : ''}
     ${paused.map((t) => pausedRow(p, t)).join('')}
     ${done.map((t) => doneRow(t)).join('')}
     ${footer}
@@ -426,14 +469,17 @@ function taskRow(p, t, c, day) {
   const last = notes[notes.length - 1];
   const inProgress = notes.length > 0;
   const panelOpen = S.pauseOpen === t.id;
+  const pinned = t.kind === 'pinned';
+  const pinFull = c.pin_count >= c.pin_limit;
   const badges = [
     t.priority === 2 ? `<span class="badge red">High</span>` : '',
     dueLabel(t.due_date, day),
     t.owner === 'both' ? `<span class="badge blue">Together</span>` : '',
     inProgress ? `<span class="badge blue">In progress</span>` : '',
     t.kind === 'pick' && t.days >= 1 && !inProgress ? `<span class="badge">Day ${t.days + 1}</span>` : '',
+    pinned ? `<span class="badge pinned">${ICON.pinFill}Pinned</span>` : '',
   ].join('');
-  const canSwap = !c.swap_used && t.kind !== 'shared';
+  const canSwap = !c.swap_used && t.kind === 'pick';
   const nudge = t.kind === 'pick' && t.days >= 3 && !inProgress
     ? `<div class="nudge">This one's been here ${t.days + 1} days. Too big?
          <button class="link" data-act="split" data-p="${p}" data-id="${t.id}" data-title="${esc(t.title)}">Break it into a smaller first step</button></div>`
@@ -441,7 +487,9 @@ function taskRow(p, t, c, day) {
   const data = `data-p="${p}" data-id="${t.id}" data-title="${esc(t.title)}"`;
   return `
   <div class="task ${t.kind}">
-    <div class="title">${esc(t.title)}</div>
+    <div class="title-row"><div class="title">${esc(t.title)}</div>
+      ${pinned ? `<button class="pin-btn on" aria-label="Unpin ${esc(t.title)}" data-act="unpin" ${data}>${ICON.pinFill}</button>`
+        : `<button class="pin-btn" aria-label="${pinFull ? 'Pins full (3)' : 'Pin to my Today'}" data-act="pin" ${data} ${pinFull ? 'disabled' : ''}>${ICON.pin}</button>`}</div>
     ${badges ? `<div class="badges">${badges}</div>` : ''}
     ${last ? `<div class="leftoff"><b>Left off:</b> ${esc(last.note)}</div>` : ''}
     ${t.notes ? `<div class="notes">${esc(t.notes)}</div>` : ''}
@@ -452,6 +500,19 @@ function taskRow(p, t, c, day) {
       <button class="btn-pause" aria-label="Pause: note where you left off and pick a day to come back" aria-expanded="false" data-act="pause" ${data}>${ICON.pause}</button>
       <button class="btn-swap" aria-label="Not today (uses your swap)" data-act="swap" ${data} ${canSwap ? '' : 'disabled'}>${ICON.cross}</button>
     </div>`}
+  </div>`;
+}
+
+function dueRows(p, due, c, day) {
+  const shown = due.slice(0, 2);
+  const full = c.pin_count >= c.pin_limit;
+  return `<div class="due-box">
+    ${shown.map((t) => `<div class="due-row">
+      <span class="due-label">${t.due_date < day ? 'Overdue' : 'Due today'}</span>
+      <span class="due-title">${esc(t.title)}</span>
+      <button class="due-pin" data-act="pin" data-p="${p}" data-id="${t.id}" ${full ? 'disabled' : ''}>${ICON.pin}<span>${full ? 'Pins full' : 'Pin it'}</span></button>
+    </div>`).join('')}
+    ${due.length > 2 ? `<button class="link small" data-act="seeAll">+${due.length - 2} more due</button>` : ''}
   </div>`;
 }
 
@@ -480,6 +541,14 @@ async function onMainClick(e) {
   if (act === 'hideInstall') { store.set('hideInstall', '1'); return renderToday(); }
 
   if (act === 'settings') { S.tab = 'settings'; return render(); }
+  if (act === 'help') { S.tab = 'help'; return render(); }
+  if (act === 'tour') return showTour(0);
+  if (act === 'seeAll') { S.tab = 'all'; return render(); }
+  if (act === 'pin' || act === 'unpin') {
+    const r = await rpc(act === 'pin' ? 'pin_task' : 'unpin_task', { p, p_task: id });
+    if (r) { S.board = r; renderToday(); if (act === 'pin') toast('Pinned to Today'); }
+    return;
+  }
 
   if (act === 'done') {
     b.disabled = true;
@@ -760,6 +829,7 @@ function renderAdd() {
         <label>Notes<textarea name="notes" rows="2"></textarea></label>
       </div>
     </details>
+    ${isPerson(me()) ? `<label class="switch-row"><span>Pin to my Today<small>Shows on your card until it's done</small></span><input type="checkbox" id="addPin"><span class="switch" aria-hidden="true"></span></label>` : ''}
     <button class="primary" type="submit" id="addBtn" ${S.addOwner ? '' : 'disabled'}>Add task</button>
   </form>`;
 
@@ -789,6 +859,7 @@ function renderAdd() {
     $('#addBtn').disabled = false;
     if (error) return toast(error.message);
     if (row.owner !== row.created_by) notify({ event: 'added', task_id: data.id });
+    if ($('#addPin')?.checked && (row.owner === me() || row.owner === 'both')) await rpc('pin_task', { p: me(), p_task: data.id });
     toast(`Added to ${row.owner === me() ? 'your' : row.owner === 'both' ? 'both' : `${nameOf(row.owner)}'s`} list`);
     S.addPri = 1;
     renderAdd();
@@ -1019,6 +1090,10 @@ function openEdit(t) {
       <button value="toggle">${t.done_at ? 'Mark not done' : 'Mark done'}</button>
     </div>
     <div class="row-buttons">
+      ${!t.done_at && isPerson(me()) && (t.owner === me() || t.owner === 'both')
+        ? (t.pinned_by === me() ? `<button value="unpin">${ICON.pinFill}<span>Unpin</span></button>` : `<button value="pin">${ICON.pin}<span>Pin to my Today</span></button>`) : ''}
+    </div>
+    <div class="row-buttons">
       <button value="cancel" class="ghost" formnovalidate>Cancel</button>
       <button value="delete" class="danger" formnovalidate>Delete</button>
     </div>
@@ -1049,6 +1124,9 @@ function openEdit(t) {
         if (isPerson(by)) notify({ event: 'done', task_id: t.id });
       }
       loadHome();
+    } else if (action === 'pin' || action === 'unpin') {
+      const r = await rpc(action === 'pin' ? 'pin_task' : 'unpin_task', { p: me(), p_task: t.id });
+      if (r) toast(action === 'pin' ? 'Pinned to Today' : 'Unpinned');
     } else if (action === 'delete') {
       if (!confirm(`Delete "${t.title}"? This can't be undone.`)) return;
       const { error } = await sb.from('tasks').delete().eq('id', t.id);
@@ -1085,6 +1163,23 @@ function renderSettings() {
   body.innerHTML = `
   ${header('Your household', 'Settings')}
   <div class="panel stack">
+    <h2>Household code</h2>
+    <div class="code-big small-code">${esc(S.status.code || '')}</div>
+    <p class="muted">Anyone with this code can join your household. Share it only with your partner (or a shared screen like the wall display).</p>
+    <div class="row-buttons">
+      <button data-act-code="copy">${ICON.copy}<span>Copy</span></button>
+      ${navigator.share ? `<button data-act-code="share">Share</button>` : ''}
+      <button id="newCode">Make a new code</button>
+    </div>
+  </div>
+  <div class="panel stack">
+    <h2>Help</h2>
+    <div class="row-buttons">
+      <button data-act="help">${ICON.help}<span>How it works</span></button>
+      <button data-act="tour">Replay the tour</button>
+    </div>
+  </div>
+  <div class="panel stack">
     <h2>This device</h2>
     <p>Belongs to <b>${esc(p === 'shared' ? 'the shared screen' : nameOf(p))}</b>. <button class="link" id="changeWho">Change</button></p>
   </div>
@@ -1102,15 +1197,9 @@ function renderSettings() {
   </form>
   <div class="panel stack">
     <h2>Backup</h2>
-    <p class="muted">Saves every task to a file. Worth doing once a month.</p>
+    <p class="muted">Saves your tasks, lists, Stars and room to a file. Worth doing once a month.</p>
     <button id="exportBtn">Export backup</button>
   </div>
-  <form class="panel stack" id="passForm">
-    <h2>Change household passcode</h2>
-    <label>Current passcode<input type="password" name="old" required autocomplete="current-password"></label>
-    <label>New passcode<input type="password" name="new" minlength="6" required autocomplete="new-password"></label>
-    <button>Change passcode</button>
-  </form>
   <p class="center muted small">One Thing · version ${APP_VERSION}</p>`;
 
   $('#changeWho').onclick = () => renderWho(false);
@@ -1128,12 +1217,66 @@ function renderSettings() {
     const r = await rpc('update_names', { p_name1: f.get('n1'), p_name2: f.get('n2') });
     if (r) { S.status = r; toast('Names saved'); loadBoard(); }
   };
-  $('#passForm').onsubmit = async (e) => {
-    e.preventDefault(); const f = new FormData(e.target);
-    const r = await rpc('change_passcode', { p_old: f.get('old'), p_new: f.get('new') });
-    if (r) { e.target.reset(); toast('Passcode changed'); }
+  body.querySelectorAll('[data-act-code]').forEach((b) => b.onclick = () => shareCode(b.dataset.actCode));
+  $('#newCode').onclick = async () => {
+    if (!confirm('Make a new household code?\n\nThe old code stops working right away. Devices already joined stay joined.')) return;
+    const r = await rpc('regenerate_code'); if (r) { S.status = r; renderSettings(); toast('New code ready'); }
   };
   $('#exportBtn').onclick = exportBackup;
+}
+
+// ---------- How it works ------------------------------------------------------
+const HELP = [
+  ['Your day', `<p>Each of you gets <b>one thing</b> a day, picked for you: urgent tasks (High, or due within 2 days) go first, then Normal, then Low. The day resets at 4 a.m.</p>
+    <p><b>Pins</b> ${ICON.pinFill} keep up to 3 tasks on your card until they're done. Use them for "this has to happen." A task due today shows a little <b>Pin it</b> prompt.</p>
+    <p>Finished early? <b>Give me another</b> hands you one more.</p>`],
+  ['When you can\'t today', `<p><b>✗ Swap</b>: not today. One per day; it goes back in the pile.</p>
+    <p><b>⏸ Pause</b>: write where you left off (+3 Stars), pick a day to come back, and get a new task now if you want. High tasks come back pinned on their day; others rejoin the shuffle.</p>
+    <p>Stuck on something for 3+ days? You'll be offered to <b>break it into a smaller first step</b>.</p>`],
+  ['Stars, XP & your home', `<p>Add a task +1 (5 a day each) · Finish +10 (High +15) · +1 per day it waited (up to +5) · Pause note +3 · Shopping done +10 plus 1 per item (max +30) · Together bonus +5 each.</p>
+    <p>XP only goes up and brings <b>levels</b> — each adds something to your room. <b>Stars</b> are for the <b>Store</b>: 8 new items every Monday, plus limited seasonal pieces. Replaced items wait in <b>Storage</b>. Nothing is ever taken away, and missed days cost nothing.</p>`],
+  ['Lists', `<p>Two shared lists: <b>Groceries</b> and <b>Household</b>. Type several things at once with commas ("milk, eggs, 2 avocados"). Tap a <b>Usual</b> chip to re-add something.</p>
+    <p><b>List is ready</b> lets your partner know. Tick items as they go in the cart, then <b>Got everything</b>. At 8+ grocery items, <b>Order groceries</b> shows up for both of you.</p>`],
+  ['Doing it together', `<p>Tap <b>Do ours together</b> on Today. Your partner gets a Join notification; you both get 25 minutes, and if you each finish a task before it ends, +5 Stars each.</p>`],
+  ['Notifications', `<p>7 a.m.: what's on your card. 7 p.m.: only if something's still open. Plus a heads-up when your partner adds to your list, finishes something, or says a list is ready.</p>`],
+  ['Your household', `<p>Your partner joins with the <b>household code</b> in Settings. Lost a phone? Open One Thing on the new one, tap <b>I have a code</b>, and you're back. You can make a new code anytime.</p>`],
+];
+function renderHelp() {
+  main().innerHTML = `
+    ${header('A quick guide', 'How it works')}
+    <div class="help">${HELP.map(([h, body]) => `<section class="panel"><h2>${h}</h2>${body}</section>`).join('')}
+      <div class="row-buttons"><button class="btn-soft" data-act="tour">Replay the tour</button><button class="btn-soft" data-act="settings">Back to Settings</button></div>
+    </div>`;
+}
+
+const TOUR = [
+  ['Welcome to One Thing', 'Too many tasks at once freezes ADHD brains. So each of you sees just <b>one thing</b> a day. Everything else waits quietly.', 'window_classic', 'wall_left'],
+  ['Pin what really matters', 'Up to <b>3 pins</b> stay on your card until done. Urgent tasks jump the line for your one thing, without flooding your screen.', null, null],
+  ['Can\'t do it today?', '<b>✗</b> swaps it (once a day). <b>⏸</b> pauses it with a note and a day to come back. No guilt, no streaks.', null, null],
+  ['Build your home', 'Every task earns <b>Stars</b> and <b>XP</b>. Levels add furniture; the Store lets you pick more. Start in an empty room and make it yours.', 'sofa_mint', 'floor_mid'],
+  ['Better together', 'Shared <b>Lists</b>, a <b>Do ours together</b> timer, and cheers when your partner finishes something. Tap the <b>+</b> to add your first task.', 'lights_string', 'ceiling'],
+];
+function maybeTour() { if (store.get('toured') !== '1') setTimeout(() => showTour(0), 400); }
+function showTour(i) {
+  const d = $('#levelDialog');
+  const [title, text, item, spot] = TOUR[i];
+  d.innerHTML = `
+    <div class="tour">
+      <div class="tour-dots" aria-hidden="true">${TOUR.map((_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('')}</div>
+      ${item ? `<div class="lv-item">${itemThumb(item, spot)}</div>` : `<div class="tour-icon">${i === 1 ? ICON.pinFill : ICON.pause}</div>`}
+      <h2>${title}</h2>
+      <p>${text}</p>
+      <div class="row-buttons">
+        <button class="ghost" data-tour="skip">${i === TOUR.length - 1 ? 'Close' : 'Skip'}</button>
+        <button class="primary" data-tour="next">${i === TOUR.length - 1 ? "Let's go" : 'Next'}</button>
+      </div>
+    </div>`;
+  d.onclick = (e) => {
+    const b = e.target.closest('[data-tour]'); if (!b) return;
+    if (b.dataset.tour === 'next' && i < TOUR.length - 1) return showTour(i + 1);
+    store.set('toured', '1'); d.close();
+  };
+  if (!d.open) d.showModal();
 }
 
 // ---------- Push notifications -----------------------------------------------
@@ -1180,13 +1323,15 @@ async function resyncPush() {
 
 // ---------- Backup -----------------------------------------------------------
 async function exportBackup() {
-  const [{ data: tasks, error }, { data: owned }, { data: ledger }] = await Promise.all([
+  const [{ data: tasks, error }, { data: owned }, { data: ledger }, { data: shop_items }, { data: trips }] = await Promise.all([
     sb.from('tasks').select('*').order('created_at'),
     sb.from('owned').select('*'),
     sb.from('ledger').select('*').order('id'),
+    sb.from('shop_items').select('*').order('added_at'),
+    sb.from('trips').select('*').order('at'),
   ]);
   if (error) return toast(error.message);
-  const json = JSON.stringify({ exported_at: new Date().toISOString(), names: S.status.names, tasks, owned, ledger }, null, 2);
+  const json = JSON.stringify({ exported_at: new Date().toISOString(), app_version: APP_VERSION, names: S.status.names, tasks, owned, ledger, shop_items, trips }, null, 2);
   const name = `one-thing-backup-${localISO()}.json`;
   const file = new File([json], name, { type: 'application/json' });
   try {

@@ -438,3 +438,56 @@ button.link.light, button.ghost.light { color: #D8C9B6 !important; border-color:
 /* ===== Store additions ===== */
 .item-art { position: relative; }
 .limited { position: absolute; top: 6px; left: 6px; z-index: 1; background: #5E4E8C; color: #fff; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 800; text-transform: capitalize; }
+
+/* ===== v4: welcome, household code, pins, help, tour ===== */
+.welcome-logo { width: 84px; height: 84px; border-radius: 20px; display: block; margin: 0 auto; box-shadow: 0 6px 0 var(--line-strong); }
+.welcome { text-align: left; }
+.welcome > h1 { text-align: center; }
+.welcome .lead { text-align: center; }
+.center-text { text-align: center; }
+.code-big {
+  font-family: var(--display); font-weight: 700; font-size: 40px; letter-spacing: .12em; text-align: center;
+  background: var(--paper); border: 3px dashed var(--line-strong); border-radius: 18px; padding: 14px 8px; color: var(--ink);
+  user-select: all; -webkit-user-select: all;
+}
+.code-big.small-code { font-size: 30px; }
+.code-input { font-family: var(--display) !important; font-size: 26px !important; letter-spacing: .12em; text-transform: uppercase; text-align: center; }
+.row-buttons button svg { width: 18px; height: 18px; vertical-align: -3px; margin-right: 4px; }
+.chips { display: flex; gap: 6px; align-items: center; }
+.chip.pins { display: inline-flex; align-items: center; gap: 3px; }
+.chip.pins svg { width: 13px; height: 13px; }
+.title-row { display: flex; align-items: flex-start; gap: 10px; }
+.title-row .title { flex: 1; min-width: 0; }
+.pin-btn {
+  width: 40px; height: 40px; flex: none; border-radius: 12px; border: 2px solid var(--line); background: var(--surface);
+  color: var(--muted); display: grid; place-items: center; padding: 0; cursor: pointer;
+}
+.pin-btn svg { width: 20px; height: 20px; }
+.pin-btn.on { background: var(--butter); border-color: var(--butter-line); color: var(--butter-ink); }
+.pin-btn:disabled { opacity: .35; cursor: default; }
+.badge.pinned { background: var(--butter); color: var(--butter-ink); display: inline-flex; align-items: center; gap: 3px; }
+.badge.pinned svg { width: 12px; height: 12px; }
+.task.pinned { position: relative; }
+.due-box { margin-top: 10px; border-top: 2px dashed var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.due-row { display: flex; align-items: center; gap: 8px; background: var(--amber-soft); border-radius: 12px; padding: 6px 8px 6px 10px; }
+.due-label { font-size: 12px; font-weight: 800; color: var(--amber); text-transform: uppercase; letter-spacing: .04em; flex: none; }
+.due-title { flex: 1; min-width: 0; font-weight: 800; font-size: 15px; overflow-wrap: anywhere; }
+.due-pin {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 10px; border-radius: 10px;
+  border: 0; background: var(--butter); color: var(--butter-ink); font-weight: 800; font-size: 13px; cursor: pointer;
+}
+.due-pin svg { width: 14px; height: 14px; }
+.due-pin:disabled { opacity: .5; }
+.help { max-width: 640px; margin: 0 auto; }
+.help .panel p { margin: 0 0 10px; font-weight: 600; line-height: 1.5; }
+.help .panel p:last-child { margin-bottom: 0; }
+.help .panel svg { width: 16px; height: 16px; vertical-align: -2px; }
+.help h2 { margin-bottom: 8px; }
+.tour { text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.tour p { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.5; color: var(--ink-soft); }
+.tour .row-buttons { width: 100%; }
+.tour-dots { display: flex; gap: 6px; }
+.tour-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.tour-dots span.on { background: var(--mint-deep); width: 22px; border-radius: 999px; }
+.tour-icon { width: 120px; height: 120px; border-radius: 28px; background: var(--butter); color: var(--butter-ink); display: grid; place-items: center; }
+.tour-icon svg { width: 56px; height: 56px; }
