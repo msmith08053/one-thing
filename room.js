@@ -7,7 +7,8 @@ export const SPOTS = {
   wall_left:   { x: 20,  y: 40,  w: 124, h: 134, label: 'Window wall' },
   wall_mid:    { x: 160, y: 46,  w: 78,  h: 80,  label: 'Middle of the wall' },
   wall_right:  { x: 250, y: 52,  w: 96,  h: 80,  label: 'Right wall' },
-  rug:         { x: 40,  y: 326, w: 280, h: 84,  label: 'Floor (rug)' },
+  // px/py: where the "+" sits when empty (the rug's center is the Front spot, so its + goes left).
+  rug:         { x: 40,  y: 326, w: 280, h: 84,  label: 'Floor (rug)', px: 84, py: 372 },
   floor_left:  { x: 6,   y: 176, w: 80,  h: 162, label: 'Left corner' },
   floor_right: { x: 282, y: 146, w: 74,  h: 194, label: 'Right corner' },
   floor_mid:   { x: 82,  y: 204, w: 200, h: 128, label: 'Main seat' },
