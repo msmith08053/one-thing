@@ -35,16 +35,16 @@ export const ART = {
     <rect x="18" y="10" width="88" height="112" rx="12" fill="#fff"/>
     <rect x="25" y="17" width="74" height="98" rx="6" fill="${n ? '#2B3A67' : C.sky}"/>
     ${n ? `<circle cx="80" cy="36" r="10" fill="#FFF4C2"/><circle cx="85" cy="32" r="9" fill="#2B3A67"/>
-           <circle cx="40" cy="30" r="1.6" fill="#fff"/><circle cx="55" cy="46" r="1.2" fill="#fff"/><circle cx="34" cy="56" r="1.4" fill="#fff"/>`
-        : `<rect x="34" y="34" width="34" height="12" rx="6" fill="#fff"/><circle cx="52" cy="32" r="9" fill="#fff"/>`}
+           <circle class="a-twinkle" cx="40" cy="30" r="1.6" fill="#fff"/><circle class="a-twinkle d2" cx="55" cy="46" r="1.2" fill="#fff"/><circle class="a-twinkle d3" cx="34" cy="56" r="1.4" fill="#fff"/>`
+        : `<g class="a-cloud"><rect x="34" y="34" width="34" height="12" rx="6" fill="#fff"/><circle cx="52" cy="32" r="9" fill="#fff"/></g>`}
     <path d="M25 115 L25 96 Q50 82 70 94 Q86 86 99 92 L99 115 Z" fill="${n ? '#3E5C4E' : '#A6D8A0'}"/>
     <rect x="58" y="17" width="8" height="98" fill="#fff"/><rect x="25" y="62" width="74" height="7" fill="#fff"/>
-    <rect x="4" y="2" width="22" height="130" rx="10" fill="${C.peach}"/><rect x="98" y="2" width="22" height="130" rx="10" fill="${C.peach}"/>
+    <rect class="a-curtain" x="4" y="2" width="22" height="130" rx="10" fill="${C.peach}"/><rect class="a-curtain d2" x="98" y="2" width="22" height="130" rx="10" fill="${C.peach}"/>
     <rect x="0" y="0" width="124" height="8" rx="4" fill="${C.wood}"/>` }),
   window_round: (n) => ({ body: `
     <circle cx="62" cy="66" r="54" fill="#fff"/><circle cx="62" cy="66" r="45" fill="${n ? '#2B3A67' : C.sky}"/>
-    ${n ? `<circle cx="78" cy="48" r="9" fill="#FFF4C2"/><circle cx="45" cy="50" r="1.5" fill="#fff"/><circle cx="58" cy="38" r="1.2" fill="#fff"/>`
-        : `<circle cx="78" cy="48" r="10" fill="#FFD45C"/><rect x="34" y="52" width="30" height="10" rx="5" fill="#fff"/>`}
+    ${n ? `<circle cx="78" cy="48" r="9" fill="#FFF4C2"/><circle class="a-twinkle" cx="45" cy="50" r="1.5" fill="#fff"/><circle class="a-twinkle d2" cx="58" cy="38" r="1.2" fill="#fff"/>`
+        : `<circle cx="78" cy="48" r="10" fill="#FFD45C"/><rect class="a-cloud" x="34" y="52" width="30" height="10" rx="5" fill="#fff"/>`}
     <path d="M20 84 Q45 70 62 80 Q80 70 104 82 L100 96 Q62 124 24 96 Z" fill="${n ? '#3E5C4E' : '#A6D8A0'}"/>
     <rect x="58" y="12" width="8" height="108" fill="#fff"/><rect x="8" y="62" width="108" height="8" fill="#fff"/>
     <circle cx="62" cy="66" r="50" fill="none" stroke="${C.wood}" stroke-width="5"/>` }),
@@ -58,7 +58,7 @@ export const ART = {
   clock_wall: () => ({ body: `
     <circle cx="39" cy="40" r="31" fill="${C.cream}" stroke="${C.wood}" stroke-width="7"/>
     <circle cx="39" cy="16" r="2" fill="${C.ink}"/><circle cx="63" cy="40" r="2" fill="${C.ink}"/><circle cx="39" cy="64" r="2" fill="${C.ink}"/><circle cx="15" cy="40" r="2" fill="${C.ink}"/>
-    <path d="M39 40 L39 22 M39 40 L52 47" stroke="${C.ink}" stroke-width="4" stroke-linecap="round"/><circle cx="39" cy="40" r="3" fill="${C.ink}"/>` }),
+    <path d="M39 40 L52 47" stroke="${C.ink}" stroke-width="4" stroke-linecap="round"/><path class="a-hand" d="M39 40 L39 22" stroke="${C.ink}" stroke-width="4" stroke-linecap="round"/><circle cx="39" cy="40" r="3" fill="${C.ink}"/>` }),
   shelf_small: () => ({ body: `
     <rect x="4" y="54" width="70" height="8" rx="3" fill="${C.wood}"/>
     <path d="M12 62 L12 72 L20 62 Z M58 62 L66 62 L66 72 Z" fill="${C.woodD}"/>
@@ -109,7 +109,7 @@ export const ART = {
     return {
       body: `<path d="M0 4 Q150 70 300 4" fill="none" stroke="${C.woodDD}" stroke-width="2.5"/>` +
         pts.map(([x, y], i) => `<rect x="${x - 2}" y="${y - 6}" width="4" height="6" fill="${C.woodDD}"/><ellipse cx="${x}" cy="${y + 4}" rx="6" ry="8" fill="${cols[i]}"/>`).join(''),
-      glow: pts.map(([x, y], i) => `<circle cx="${x}" cy="${y + 4}" r="${n ? 22 : 12}" fill="url(#__GLOW__)" opacity="${n ? 0.9 : 0.4}"/>` + (n ? `<ellipse cx="${x}" cy="${y + 4}" rx="6" ry="8" fill="${cols[i]}"/><ellipse cx="${x}" cy="${y + 2}" rx="3" ry="4" fill="#fff" opacity=".7"/>` : '')).join(''),
+      glow: pts.map(([x, y], i) => `<g class="a-bulb d${(i % 3) + 1}"><circle cx="${x}" cy="${y + 4}" r="${n ? 22 : 12}" fill="url(#__GLOW__)" opacity="${n ? 0.9 : 0.4}"/>` + (n ? `<ellipse cx="${x}" cy="${y + 4}" rx="6" ry="8" fill="${cols[i]}"/><ellipse cx="${x}" cy="${y + 2}" rx="3" ry="4" fill="#fff" opacity=".7"/>` : '') + '</g>').join(''),
     };
   },
   bunting: () => {
@@ -117,16 +117,16 @@ export const ART = {
     return { body: `<path d="M0 6 Q150 40 300 6" fill="none" stroke="${C.woodDD}" stroke-width="2"/>` +
       cols.map((c, i) => { const x = 18 + i * 33; const y = 6 + Math.sin((i + 0.5) / 9 * Math.PI) * 17; return `<path d="M${x - 11} ${y} L${x + 11} ${y} L${x} ${y + 22} Z" fill="${c}"/>`; }).join('') };
   },
-  plant_hanging: () => ({ body: `
+  plant_hanging: () => ({ body: `<g class="a-swing">
     <path d="M150 0 L132 58 M150 0 L168 58 M150 0 L150 58" stroke="${C.woodDD}" stroke-width="1.6"/>
     <path d="M128 56 L172 56 L166 80 L134 80 Z" fill="${C.terra}"/><rect x="125" y="52" width="50" height="8" rx="4" fill="${C.terraL}"/>
     <ellipse cx="140" cy="50" rx="10" ry="6" fill="${C.leaf}"/><ellipse cx="160" cy="49" rx="11" ry="6" fill="${C.leafL}"/>
     <path d="M132 76 Q120 96 126 116" stroke="${C.leafD}" stroke-width="3" fill="none"/><ellipse cx="124" cy="96" rx="5" ry="8" fill="${C.leaf}"/><ellipse cx="127" cy="114" rx="5" ry="7" fill="${C.leafL}"/>
-    <path d="M168 76 Q182 100 174 124" stroke="${C.leafD}" stroke-width="3" fill="none"/><ellipse cx="180" cy="98" rx="5" ry="8" fill="${C.leafL}"/><ellipse cx="175" cy="120" rx="5" ry="7" fill="${C.leaf}"/>` }),
+    <path d="M168 76 Q182 100 174 124" stroke="${C.leafD}" stroke-width="3" fill="none"/><ellipse cx="180" cy="98" rx="5" ry="8" fill="${C.leafL}"/><ellipse cx="175" cy="120" rx="5" ry="7" fill="${C.leaf}"/></g>` }),
   paper_lanterns: (n) => {
     const L = [[60, 40, C.pink], [150, 62, C.butter], [240, 46, C.mint]];
     return {
-      body: L.map(([x, y, c]) => `<path d="M${x} 0 L${x} ${y - 16}" stroke="${C.woodDD}" stroke-width="1.6"/><rect x="${x - 6}" y="${y - 18}" width="12" height="5" rx="1" fill="${C.woodDD}"/><ellipse cx="${x}" cy="${y}" rx="17" ry="15" fill="${c}"/><path d="M${x - 15} ${y} L${x + 15} ${y} M${x - 12} ${y - 7} L${x + 12} ${y - 7} M${x - 12} ${y + 7} L${x + 12} ${y + 7}" stroke="#fff" stroke-width="1.4" opacity=".7"/>`).join(''),
+      body: L.map(([x, y, c], i) => `<g class="a-swing d${i + 1}"><path d="M${x} 0 L${x} ${y - 16}" stroke="${C.woodDD}" stroke-width="1.6"/><rect x="${x - 6}" y="${y - 18}" width="12" height="5" rx="1" fill="${C.woodDD}"/><ellipse cx="${x}" cy="${y}" rx="17" ry="15" fill="${c}"/><path d="M${x - 15} ${y} L${x + 15} ${y} M${x - 12} ${y - 7} L${x + 12} ${y - 7} M${x - 12} ${y + 7} L${x + 12} ${y + 7}" stroke="#fff" stroke-width="1.4" opacity=".7"/></g>`).join(''),
       glow: L.map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="${n ? 42 : 26}" fill="url(#__GLOW__)" opacity="${n ? 0.9 : 0.4}"/>` + (n ? `<ellipse cx="${x}" cy="${y}" rx="17" ry="15" fill="${c}"/><ellipse cx="${x}" cy="${y}" rx="9" ry="8" fill="#fff" opacity=".45"/>` : '')).join(''),
     };
   },
@@ -147,11 +147,11 @@ export const ART = {
   },
 
   // ---------- floor_left (80 × 162) ----------
-  plant_leafy: () => ({ body: `
+  plant_leafy: () => ({ body: `<g class="a-sway">
     <ellipse cx="40" cy="70" rx="12" ry="34" fill="${C.leaf}"/>
     <ellipse cx="22" cy="86" rx="10" ry="27" fill="${C.leafD}" transform="rotate(-32 22 86)"/>
     <ellipse cx="58" cy="86" rx="10" ry="27" fill="${C.leafL}" transform="rotate(32 58 86)"/>
-    <ellipse cx="28" cy="60" rx="7" ry="20" fill="${C.leafL}" transform="rotate(-14 28 60)"/>
+    <ellipse cx="28" cy="60" rx="7" ry="20" fill="${C.leafL}" transform="rotate(-14 28 60)"/></g>
     ${pot(18, 112, 44, 48)}` }),
   bookshelf: () => ({ body: `
     <rect x="8" y="18" width="64" height="142" rx="6" fill="${C.wood}"/>
@@ -170,7 +170,7 @@ export const ART = {
     <rect x="18" y="112" width="44" height="8" rx="3" fill="${C.wood}"/>
     <path d="M24 120 L18 160 M56 120 L62 160 M40 120 L40 160" stroke="${C.woodD}" stroke-width="5" stroke-linecap="round"/>
     ${pot(24, 88, 32, 26)}
-    ${[-60, -35, -12, 12, 35, 60].map((a) => `<ellipse cx="40" cy="62" rx="7" ry="30" fill="${a % 2 ? C.leafD : C.leafL}" transform="rotate(${a} 40 90)"/>`).join('')}` }),
+    <g class="a-sway d2">${[-60, -35, -12, 12, 35, 60].map((a) => `<ellipse cx="40" cy="62" rx="7" ry="30" fill="${a % 2 ? C.leafD : C.leafL}" transform="rotate(${a} 40 90)"/>`).join('')}</g>` }),
 
   // ---------- floor_mid (200 × 128) ----------
   sofa_mint: () => ({ body: `<g transform="translate(15 24)">
@@ -216,7 +216,7 @@ export const ART = {
     <path d="M48 50 L52 100 L44 100 L42 52 Z" fill="${C.pink}"/>` }),
   plant_tall: () => ({ body: `
     <path d="M37 150 Q34 100 37 50" stroke="${C.woodD}" stroke-width="5" fill="none"/>
-    ${[-70, -40, -10, 20, 50, 80].map((a, i) => `<ellipse cx="37" cy="24" rx="7" ry="30" fill="${i % 2 ? C.leaf : C.leafL}" transform="rotate(${a} 37 52)"/>`).join('')}
+    <g class="a-sway d3">${[-70, -40, -10, 20, 50, 80].map((a, i) => `<ellipse cx="37" cy="24" rx="7" ry="30" fill="${i % 2 ? C.leaf : C.leafL}" transform="rotate(${a} 37 52)"/>`).join('')}</g>
     ${pot(17, 146, 40, 46)}` }),
 
   // ---------- floor_front (80 × 74) ----------
@@ -224,29 +224,31 @@ export const ART = {
     <rect x="4" y="34" width="72" height="12" rx="5" fill="${C.wood}"/>
     <rect x="10" y="46" width="7" height="24" rx="2" fill="${C.woodD}"/><rect x="63" y="46" width="7" height="24" rx="2" fill="${C.woodD}"/>
     <rect x="22" y="20" width="14" height="14" rx="3" fill="${C.cream}"/><path d="M36 24 Q42 26 36 30" stroke="${C.cream}" stroke-width="3" fill="none"/>
-    <path d="M26 16 Q24 10 28 6 M32 16 Q30 10 34 6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
+    <path class="a-steam" d="M26 16 Q24 10 28 6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/><path class="a-steam d2" d="M32 16 Q30 10 34 6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
     <rect x="46" y="26" width="22" height="8" rx="2" fill="${C.blue}"/><rect x="48" y="20" width="18" height="6" rx="2" fill="${C.butter}"/>` }),
   fishbowl: () => ({ body: `
     <rect x="22" y="62" width="36" height="9" rx="4" fill="${C.wood}"/>
     <circle cx="40" cy="38" r="26" fill="#CDEBF5" stroke="#A9D6EA" stroke-width="3"/>
     <path d="M16 38 Q40 30 64 38 L62 48 Q40 70 18 48 Z" fill="#9FD3EA"/>
-    <ellipse cx="38" cy="45" rx="9" ry="6" fill="#F49A5C"/><path d="M46 45 L54 39 L54 51 Z" fill="#F49A5C"/><circle cx="34" cy="43" r="1.6" fill="${C.ink}"/>` }),
+    <g class="a-fish"><ellipse cx="38" cy="45" rx="9" ry="6" fill="#F49A5C"/><path d="M46 45 L54 39 L54 51 Z" fill="#F49A5C"/><circle cx="34" cy="43" r="1.6" fill="${C.ink}"/></g>` }),
   pouf: () => ({ body: `
     <ellipse cx="40" cy="44" rx="34" ry="24" fill="${C.butter}"/>
     <ellipse cx="40" cy="32" rx="30" ry="12" fill="${C.butterL}"/>
     ${[-20, -8, 4, 16].map((x) => `<path d="M${40 + x} 36 Q${42 + x} 52 ${40 + x} 64" stroke="#E7B95A" stroke-width="3" fill="none"/>`).join('')}` }),
   catbed: () => ({ body: `
     <ellipse cx="40" cy="52" rx="38" ry="18" fill="${C.lavD}"/><ellipse cx="40" cy="46" rx="30" ry="12" fill="#E9E2FA"/>
-    <ellipse cx="42" cy="42" rx="22" ry="11" fill="#9A9AA8"/>
+    <ellipse class="a-breathe" cx="42" cy="42" rx="22" ry="11" fill="#9A9AA8"/>
     <circle cx="24" cy="38" r="9" fill="#9A9AA8"/><path d="M18 32 L19 24 L24 30 Z M27 30 L31 24 L31 33 Z" fill="#9A9AA8"/>
     <path d="M20 39 Q22 41 24 39 M26 39 Q28 41 30 39" stroke="${C.ink}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-    <path d="M62 44 Q70 36 64 30" stroke="#9A9AA8" stroke-width="5" fill="none" stroke-linecap="round"/>` }),
+    <path class="a-tail" d="M62 44 Q70 36 64 30" stroke="#9A9AA8" stroke-width="5" fill="none" stroke-linecap="round"/>` }),
   radio: () => ({ body: `
     <rect x="10" y="46" width="60" height="8" rx="3" fill="${C.wood}"/><path d="M16 54 L14 72 M64 54 L66 72" stroke="${C.woodD}" stroke-width="4" stroke-linecap="round"/>
     <rect x="12" y="14" width="56" height="32" rx="8" fill="${C.peachD}"/>
     <circle cx="28" cy="30" r="10" fill="${C.cream}"/><circle cx="28" cy="30" r="5" fill="none" stroke="${C.woodD}" stroke-width="2"/>
     <rect x="44" y="22" width="18" height="6" rx="2" fill="${C.cream}"/><circle cx="48" cy="38" r="3" fill="${C.cream}"/><circle cx="58" cy="38" r="3" fill="${C.cream}"/>
-    <path d="M22 14 L34 2" stroke="${C.woodDD}" stroke-width="2" stroke-linecap="round"/>` }),
+    <path d="M22 14 L34 2" stroke="${C.woodDD}" stroke-width="2" stroke-linecap="round"/>
+    <g class="a-note" fill="${C.woodDD}"><circle cx="56" cy="8" r="2.6"/><path d="M58.4 8 L58.4 -2 L62 -1" stroke="${C.woodDD}" stroke-width="1.4" fill="none"/></g>
+    <g class="a-note d2" fill="${C.woodDD}"><circle cx="66" cy="12" r="2.2"/><path d="M68 12 L68 3" stroke="${C.woodDD}" stroke-width="1.4"/></g>` }),
 
   // ---------- seasonal ----------
   pumpkin: () => ({ body: `
@@ -265,7 +267,7 @@ export const ART = {
     <ellipse cx="25" cy="118" rx="14" ry="20" fill="#F08A3C"/><ellipse cx="49" cy="118" rx="14" ry="20" fill="#F08A3C"/><ellipse cx="37" cy="118" rx="17" ry="22" fill="#F59A4A"/>
     <path d="M36 97 Q37 90 42 87" stroke="${C.leafD}" stroke-width="4" fill="none" stroke-linecap="round"/>
     <path d="M27 112 L32 106 L34 114 Z M47 112 L42 106 L40 114 Z M26 124 Q37 134 48 124 L44 127 L37 131 L30 127 Z" fill="#FFD460"/>`,
-    glow: glowCircle(37, 118, 26, n) + (n ? `<path d="M27 112 L32 106 L34 114 Z M47 112 L42 106 L40 114 Z M26 124 Q37 134 48 124 L44 127 L37 131 L30 127 Z" fill="#FFE07A"/>` : '') }),
+    glow: `<g class="a-flicker">` + glowCircle(37, 118, 26, n) + `</g>` + (n ? `<path d="M27 112 L32 106 L34 114 Z M47 112 L42 106 L40 114 Z M26 124 Q37 134 48 124 L44 127 L37 131 L30 127 Z" fill="#FFE07A"/>` : '') }),
   tree_holiday: (n) => {
     const orn = [[30, 70, C.pink], [46, 92, C.blue], [24, 112, C.butter], [50, 128, C.pink], [32, 140, C.lav], [42, 54, C.butter]];
     return {
@@ -288,9 +290,9 @@ export const ART = {
     <path d="M31 14 q-10 -10 -12 0 Z M31 14 q10 -10 12 0 Z" fill="${C.butter}"/>` }),
   tulips: () => {
     const fl = [[22, 52, C.pink], [40, 40, C.butter], [58, 50, '#E86A6A'], [31, 66, '#E86A6A'], [50, 64, C.pink]];
-    return { body: fl.map(([x, y]) => `<path d="M${x} ${y + 8} Q${(x + 40) / 2} ${y + 50} 40 120" stroke="${C.leafD}" stroke-width="3" fill="none"/>`).join('') +
+    return { body: `<g class="a-sway">` + fl.map(([x, y]) => `<path d="M${x} ${y + 8} Q${(x + 40) / 2} ${y + 50} 40 120" stroke="${C.leafD}" stroke-width="3" fill="none"/>`).join('') +
       `<ellipse cx="28" cy="104" rx="5" ry="14" fill="${C.leaf}" transform="rotate(-20 28 104)"/><ellipse cx="52" cy="104" rx="5" ry="14" fill="${C.leafL}" transform="rotate(20 52 104)"/>` +
-      fl.map(([x, y, c]) => `<path d="M${x - 8} ${y} Q${x - 8} ${y + 14} ${x} ${y + 14} Q${x + 8} ${y + 14} ${x + 8} ${y} L${x + 4} ${y + 5} L${x} ${y - 2} L${x - 4} ${y + 5} Z" fill="${c}"/>`).join('') +
+      fl.map(([x, y, c]) => `<path d="M${x - 8} ${y} Q${x - 8} ${y + 14} ${x} ${y + 14} Q${x + 8} ${y + 14} ${x + 8} ${y} L${x + 4} ${y + 5} L${x} ${y - 2} L${x - 4} ${y + 5} Z" fill="${c}"/>`).join('') + `</g>` +
       pot(20, 116, 40, 44) };
   },
   flower_garland: () => {
@@ -356,7 +358,7 @@ export function itemThumb(itemId, spot, cls = '') {
 
 let uid = 0;
 const glowDef = (gid) => `<defs><radialGradient id="${gid}"><stop offset="0" stop-color="#FFF1BF" stop-opacity=".95"/><stop offset=".45" stop-color="#FFE29A" stop-opacity=".5"/><stop offset="1" stop-color="#FFE29A" stop-opacity="0"/></radialGradient></defs>`;
-// The whole room. placed: { spot: item_id }. opts: { night, slice, empty }
+// The whole room. placed: { spot: item_id }. opts: { night, slice, empty, animate }
 export function roomSVG(placed, opts = {}) {
   const n = !!opts.night; const id = 'r' + (++uid);
   const wall = WALLS[placed.wallpaper] || WALLS.default;
@@ -369,7 +371,7 @@ export function roomSVG(placed, opts = {}) {
     items += wrap(a.body);
     if (a.glow) glows += wrap(a.glow.replaceAll('__GLOW__', id + 'g'));
   }
-  return `<svg class="room-svg" viewBox="0 0 360 430" preserveAspectRatio="${opts.slice ? 'xMidYMax slice' : 'xMidYMid meet'}" role="img" aria-label="Your shared room${opts.empty ? ', still empty' : ''}">
+  return `<svg class="room-svg${opts.animate ? ' animated' : ''}" viewBox="0 0 360 430" preserveAspectRatio="${opts.slice ? 'xMidYMax slice' : 'xMidYMid meet'}" role="img" aria-label="Your shared room${opts.empty ? ', still empty' : ''}">
     ${glowDef(id + 'g')}
     <defs>
       ${wallPattern(id + 'w', wall)}

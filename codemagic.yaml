@@ -1,0 +1,45 @@
+# One Thing: iPhone App Store build on Codemagic (builds on a cloud Mac, so you don't need one).
+# Setup steps are in STORE-LAUNCH.md. Before the first build, replace the two CHANGE-ME values below.
+workflows:
+  ios-app-store:
+    name: iPhone App Store (TestFlight)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: One Thing API key          # CHANGE-ME if you named the key differently in Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.YOURNAME.onething     # CHANGE-ME: must match native/capacitor.config.json and App Store Connect
+      vars:
+        APP_STORE_APP_ID: 0000000000                 # CHANGE-ME: App Store Connect → your app → App Information → Apple ID
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Install the iPhone shell
+        working_directory: native
+        script: npm ci || npm install
+      - name: Copy the web app into the iPhone shell
+        working_directory: native
+        script: npm run www
+      - name: Sync Capacitor
+        working_directory: native
+        script: npx cap sync ios
+      - name: Use the App Store signing profile
+        script: xcode-project use-profiles --project native/ios/App/App.xcodeproj
+      - name: Next build number
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null || echo 0)
+          cd native/ios/App && agvtool new-version -all $((LATEST + 1))
+      - name: Build the app
+        script: |
+          xcode-project build-ipa \
+            --project native/ios/App/App.xcodeproj \
+            --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

@@ -1,16 +1,20 @@
-// One Thing — app logic (v5: Plan calendar)
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+// One Thing — app logic (v6: Events, Someday Together, store-ready)
+import { createClient } from './vendor/supabase.js';   // bundled (no code downloaded at runtime)
 import { CONFIG } from './config.js';
-import { SPOTS, STYLE_SPOTS, roomSVG, itemThumb, isEvening } from './room.js?v=5';
+import { SPOTS, STYLE_SPOTS, roomSVG, itemThumb, isEvening } from './room.js?v=6';
 
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 
 // ---------- Small helpers ----------------------------------------------------
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const main = () => $('#main');
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Running inside the App Store app (Capacitor) rather than a browser?
+const isNative = () => !!window.Capacitor?.isNativePlatform?.();
+const nativePush = () => window.Capacitor?.Plugins?.PushNotifications;
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -109,7 +113,8 @@ const header = (eyebrow, title) => `
 let sb;
 
 async function boot() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if (!isNative() && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if (isNative()) document.documentElement.classList.add('native');
 
   if (!CONFIG.SUPABASE_URL || CONFIG.SUPABASE_URL.includes('YOUR-') || CONFIG.SUPABASE_KEY.includes('YOUR-')) {
     main().innerHTML = `<div class="panel"><h1>Almost there</h1><p>Open <code>config.js</code> and paste in your Supabase URL and key (setup guide, step 6).</p></div>`;
@@ -288,6 +293,7 @@ function startApp() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shop_items' }, reloadLists)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, reloadPlan)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'event_went' }, reloadPlan)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'someday' }, () => { clearTimeout(tp); tp = setTimeout(loadSomeday, 300); })
       .subscribe();
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadBoard(); loadHome(); loadLists(); loadExtras(); if (S.tab === 'plan') loadPlan(); checkVersion(); } });
     setInterval(() => { loadBoard(); loadHome(); loadExtras(); if (S.tab === 'plan') loadPlan(); }, 5 * 60 * 1000); // 4 a.m. rollover, evening mode, "I went" opening up
@@ -300,10 +306,12 @@ function startApp() {
   loadHome();
   loadLists();
   loadExtras();
+  loadSomeday();
 }
 
 // New version on GitHub? Offer a one-tap refresh (phones otherwise cache for a while).
 async function checkVersion() {
+  if (isNative()) return;
   try {
     const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
@@ -321,11 +329,11 @@ async function checkVersion() {
 let lastTab = null;
 function render() {
   if (S.tab !== lastTab) { main().scrollTop = 0; $('#fab').classList.remove('tuck'); lastTab = S.tab; }
-  const lit = S.tab === 'all' ? 'today' : S.tab === 'event' ? (S.evBack === 'today' ? 'today' : 'plan') : S.tab;
+  const lit = S.tab === 'store' ? 'home' : S.tab === 'event' ? (S.evBack === 'today' ? 'today' : 'plan') : S.tab;
   document.querySelectorAll('#tabs [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === lit));
   document.body.dataset.tab = S.tab;
   renderScene();
-  $('#fab').hidden = ['add', 'settings', 'help', 'event'].includes(S.tab);
+  $('#fab').hidden = ['add', 'settings', 'help', 'event', 'doc'].includes(S.tab);
   $('#fab').setAttribute('aria-label', S.tab === 'plan' ? 'Add an event' : 'Add a task');
   if (S.tab !== 'today') S.pauseOpen = null;
   if (S.tab === 'today') { renderToday(); loadBoard(); loadExtras(); }
@@ -337,6 +345,7 @@ function render() {
   else if (S.tab === 'store') { renderStore(); loadHome(); }
   else if (S.tab === 'all') renderAll();
   else if (S.tab === 'help') renderHelp();
+  else if (S.tab === 'doc') { /* filled by showDoc */ }
   else renderSettings();
 }
 
@@ -381,15 +390,14 @@ function renderToday() {
   const b = S.board;
   if (!b) { main().innerHTML = `<div class="center muted">Loading…</div>`; return; }
   const order = isPerson(me()) ? [me(), other(me())] : ['p1', 'p2'];
-  const showInstall = isIOS && !isStandalone() && store.get('hideInstall') !== '1';
+  const showInstall = !isNative() && isIOS && !isStandalone() && store.get('hideInstall') !== '1';
   main().innerHTML = `
     ${header(esc(fmtDay(b.day, { weekday: 'long', month: 'long', day: 'numeric' })), 'Today')}
     ${showInstall ? `<div class="banner">To get notifications, tap <b>Share</b> → <b>Add to Home Screen</b>, then open One Thing from your home screen. <button data-act="hideInstall" class="link">Hide</button></div>` : ''}
     ${todaysPlans()}
     ${togetherBlock(b.together)}
     <section class="cards">${order.map((p, i) => card(p, b[p], b.day, i)).join('')}</section>
-    ${b.week_done ? `<p class="weekdone"><b>${b.week_done}</b> done together this week</p>` : ''}
-    <div class="center-row"><button class="see-all" data-act="seeAll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1.2" fill="currentColor"/><circle cx="4" cy="12" r="1.2" fill="currentColor"/><circle cx="4" cy="18" r="1.2" fill="currentColor"/></svg>See all tasks${S.extras ? ` · ${S.extras.open_total}` : ''}</button></div>`;
+    ${b.week_done ? `<p class="weekdone"><b>${b.week_done}</b> done together this week</p>` : ''}`;
   tickTimer();
   const ta = $('#pauseNote'); if (ta && S.pauseDraft?.focus) { ta.focus(); S.pauseDraft.focus = false; }
 }
@@ -569,10 +577,12 @@ async function onMainClick(e) {
 
   if (act === 'settings') { S.tab = 'settings'; return render(); }
   if (act === 'help') { S.tab = 'help'; return render(); }
+  if (act === 'doc') return showDoc(b.dataset.doc);
   if (act === 'tour') return showTour(0);
   if (act === 'seeAll') { S.tab = 'all'; return render(); }
   if (act === 'backToday') { S.tab = 'today'; return render(); }
-  if (['goPlan', 'planDay', 'planWeek', 'planToday', 'newEvent', 'editEvent', 'evCancel', 'went', 'unwent'].includes(act)) return onPlanClick(act, b);
+  if (['goPlan', 'planDay', 'planWeek', 'planToday', 'newEvent', 'editEvent', 'evCancel', 'went', 'unwent',
+       'evView', 'sdSurprise', 'sdDo', 'sdEdit', 'sdGoEvent', 'sdDone'].includes(act)) return onPlanClick(act, b);
   if (act === 'pin' || act === 'unpin') {
     const r = await rpc(act === 'pin' ? 'pin_task' : 'unpin_task', { p, p_task: id });
     if (r) { S.board = r; renderToday(); if (act === 'pin') toast('Pinned to Today'); }
@@ -581,8 +591,11 @@ async function onMainClick(e) {
 
   if (act === 'done') {
     b.disabled = true;
-    const r = await rpc('complete_task', { p_task: id, p_by: p });
-    if (!r) return;
+    // A little "done!" moment: the button pops, the title strikes, the task sweeps off.
+    const row = b.closest('.task'); const animate = row && !reducedMotion();
+    if (animate) row.classList.add('completing');
+    const [r] = await Promise.all([rpc('complete_task', { p_task: id, p_by: p }).catch(() => null), sleep(animate ? 650 : 0)]);
+    if (!r) { row?.classList.remove('completing'); b.disabled = false; return; }
     if (r.award) celebrate(`+${r.award} Stars!`, b);
     if (r.together_bonus) setTimeout(() => celebrate('+5 each: together bonus!', $('.together') || b), 700);
     S.board = r; renderToday();
@@ -652,6 +665,7 @@ async function onMainClick(e) {
   if (act === 'spot') openSpot(b.dataset.spot);
   if (act === 'storage') openStorage();
   if (act === 'goStore') { S.storeSpot = null; S.tab = 'store'; render(); }
+  if (act === 'goHome') { S.storeSpot = null; S.tab = 'home'; render(); }
 
   // Store
   if (act === 'cat') { S.storeCat = b.dataset.cat; renderStore(); }
@@ -700,7 +714,7 @@ function renderHome() {
   main().innerHTML = `
     ${header(`Living room · Level ${h.level}`, 'Our Home')}
     <div class="room-wrap">
-      ${roomSVG(placed, { night: isEvening(), empty })}
+      ${roomSVG(placed, { night: isEvening(), empty, animate: true })}
       <div class="spots">${spots}</div>
       ${empty ? `<div class="room-empty"><b>Your home is empty.</b><br>Finish tasks to earn Stars and XP — your first piece arrives at level 2.</div>` : ''}
     </div>
@@ -781,7 +795,7 @@ const CATS = { all: 'All', limited: 'Limited', furniture: 'Furniture', plants: '
 
 function renderStore() {
   const h = S.home;
-  if (!h) { main().innerHTML = `${header('New stock every Monday', 'Store')}<div class="center muted">Loading…</div>`; return; }
+  if (!h) { main().innerHTML = `<button class="link back" data-act="goHome">‹ Home</button>${header('New stock every Monday', 'Store')}<div class="center muted">Loading…</div>`; return; }
   const days = h.restock_in;
   const cats = ['all', ...Object.keys(CATS).filter((c) => c !== 'all' && h.stock.some((i) => (c === 'limited' ? i.season : i.category === c)))];
   let items = h.stock;
@@ -807,6 +821,7 @@ function renderStore() {
   };
 
   main().innerHTML = `
+    <button class="link back" data-act="goHome">‹ Home</button>
     ${header(`New stock every Monday · ${days === 1 ? '1 day' : days + ' days'} left`, 'Store')}
     <div class="cats" role="tablist" aria-label="Categories">
       ${S.storeSpot ? `<button class="cat on" data-act="clearSpot">For: ${esc(allSpots()[S.storeSpot].label)} ✕</button>`
@@ -1139,13 +1154,20 @@ function todaysPlans() {
   const items = S.extras?.items ?? [];
   if (!items.length) return '';
   return `
-  <section class="plans-strip" aria-label="Today's plans">
-    <div class="plans-head"><span>Today's plans</span><button class="link small" data-act="goPlan">See week</button></div>
+  <section class="plans-strip" aria-label="Today's events">
+    <div class="plans-head"><span>Today's events</span><button class="link small" data-act="goPlan">See week</button></div>
     ${items.map((ev) => eventCard(ev, true)).join('')}
   </section>`;
 }
 
+const evSeg = () => `
+    <div class="seg wide" role="tablist" aria-label="Events view">
+      <button role="tab" aria-selected="${S.evView !== 'someday'}" class="${S.evView !== 'someday' ? 'on' : ''}" data-act="evView" data-v="cal">Calendar</button>
+      <button role="tab" aria-selected="${S.evView === 'someday'}" class="${S.evView === 'someday' ? 'on' : ''}" data-act="evView" data-v="someday">Someday, Together${S.someday?.ideas?.length ? ` <span class="muted">· ${S.someday.ideas.length}</span>` : ''}</button>
+    </div>`;
+
 function renderPlan() {
+  if (S.evView === 'someday') return renderSomeday();
   if (!S.planWeek) S.planWeek = weekStart(todayDay());
   const ws = S.planWeek;
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
@@ -1169,7 +1191,8 @@ function renderPlan() {
       ${evs.length ? evs.map((e) => eventCard(e)).join('') : `<div class="ev-empty">Nothing planned. <button class="link small" data-act="newEvent" data-d="${d}">Add something</button></div>`}`;
   }).join('');
   main().innerHTML = `
-    ${header(esc(range), 'Plan')}
+    ${header(esc(range), 'Events')}
+    ${evSeg()}
     <div class="week">
       <button class="wk-nav" data-act="planWeek" data-n="-7" aria-label="Previous week">‹</button>
       <div class="days">${strip}</div>
@@ -1180,17 +1203,70 @@ function renderPlan() {
 }
 
 // Add / edit an event (full screen, like Add).
-function openEvent(id, date) {
+function openEvent(id, date, prefill) {
   const ev = id ? (S.plan?.items ?? []).concat(S.extras?.items ?? []).find((e) => e.id === id) : null;
   S.ev = ev ? {
     id: ev.id, title: ev.title, whose: ev.whose, date: ev.start_date, all_day: ev.all_day,
     start: ev.start_time || '', end: ev.end_time || '', repeat: ev.repeat, location: ev.location || '', notes: ev.notes || '',
   } : {
     id: null, title: '', whose: isPerson(me()) ? me() : 'both', date: date || S.planDay || todayDay(), all_day: false,
-    start: '', end: '', repeat: 'none', location: '', notes: '',
+    start: '', end: '', repeat: 'none', location: '', notes: '', someday: null, ...(prefill || {}),
   };
   S.evBack = S.tab === 'event' ? (S.evBack || 'plan') : S.tab;
+  S.picking = null;
   S.tab = 'event'; render();
+}
+
+// ----- Time picker (our own chips instead of the iPhone wheel) -----
+function timePicker(which, e) {
+  const cur = e[which] || (which === 'end' && e.start ? addMinutes(e.start, 60) : nextHour());
+  const [H, M] = cur.split(':').map(Number);
+  const h12 = ((H + 11) % 12) + 1, pm = H >= 12;
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
+  const mins = Array.from({ length: 12 }, (_, i) => i * 5);
+  return `
+  <div class="tp" role="group" aria-label="${which === 'start' ? 'Start time' : 'End time'}">
+    <div class="tp-head"><span class="tp-now">${clock(cur)}</span>
+      <div class="seg tp-ap"><button type="button" data-ap="am" class="${pm ? '' : 'on'}">AM</button><button type="button" data-ap="pm" class="${pm ? 'on' : ''}">PM</button></div></div>
+    <div class="tp-label">Hour</div>
+    <div class="tp-grid">${hours.map((h) => `<button type="button" data-h="${h}" class="${h === h12 ? 'on' : ''}">${h}</button>`).join('')}</div>
+    <div class="tp-label">Minute</div>
+    <div class="tp-grid">${mins.map((m) => `<button type="button" data-m="${m}" class="${m === M ? 'on' : ''}">:${String(m).padStart(2, '0')}</button>`).join('')}</div>
+    <div class="row-buttons">
+      ${which === 'end' ? `<button type="button" class="ghost" data-tp-clear>No end time</button>` : ''}
+      <button type="button" class="primary" data-tp-done>Done</button>
+    </div>
+  </div>`;
+}
+function addMinutes(hm, n) { const [h, m] = hm.split(':').map(Number); const t = (h * 60 + m + n + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; }
+function nextHour() { const d = new Date(); return `${String((d.getHours() + 1) % 24).padStart(2, '0')}:00`; }
+function onTimePick(x, form, e, sync) {
+  const t = x.target.closest('[data-pick],[data-h],[data-m],[data-ap],[data-tp-done],[data-tp-clear]'); if (!t) return;
+  x.preventDefault();
+  const draw = () => {
+    for (const k of ['start', 'end']) {
+      form.elements.namedItem(k).value = e[k] || '';
+      const btn = form.querySelector(`[data-pick=${k}]`);
+      btn.textContent = e[k] ? clock(e[k]) : (k === 'start' ? 'Pick a time' : 'No end time');
+      btn.classList.toggle('empty', !e[k]); btn.setAttribute('aria-expanded', String(S.picking === k));
+    }
+    $('#timePicker').innerHTML = S.picking ? timePicker(S.picking, e) : '';
+  };
+  if (t.dataset.pick) { sync(); S.picking = S.picking === t.dataset.pick ? null : t.dataset.pick; if (S.picking && !e[S.picking]) e[S.picking] = S.picking === 'end' && e.start ? addMinutes(e.start, 60) : (e[S.picking] || nextHour()); return draw(); }
+  const k = S.picking; if (!k) return;
+  let [H, M] = (e[k] || nextHour()).split(':').map(Number);
+  if (t.dataset.h) { const pm = H >= 12; H = (Number(t.dataset.h) % 12) + (pm ? 12 : 0); }
+  if (t.dataset.m) M = Number(t.dataset.m);
+  if (t.dataset.ap) H = (H % 12) + (t.dataset.ap === 'pm' ? 12 : 0);
+  if (t.dataset.h || t.dataset.m || t.dataset.ap) {
+    const was = e.start;
+    e[k] = `${String(H).padStart(2, '0')}:${String(M).padStart(2, '0')}`;
+    // Moving the start keeps the same length (or 1 hour) for the end.
+    if (k === 'start' && e.end && was) { const [a, b] = was.split(':').map(Number), [c, d] = e.end.split(':').map(Number); e.end = addMinutes(e.start, Math.max(15, (c * 60 + d) - (a * 60 + b))); }
+  }
+  if (t.hasAttribute('data-tp-clear')) { e.end = ''; S.picking = null; }
+  if (t.hasAttribute('data-tp-done')) S.picking = null;
+  draw();
 }
 
 function renderEvent() {
@@ -1201,7 +1277,7 @@ function renderEvent() {
   main().innerHTML = `
   <header class="top ev-head">
     <button class="link" data-act="evCancel">Cancel</button>
-    <h1 class="h-mid">${e.id ? 'Edit event' : 'New event'}</h1>
+    <h1 class="h-mid">${e.id ? 'Edit event' : e.someday ? "Let's do it" : 'New event'}</h1>
     <span class="spacer"></span>
   </header>
   <form id="evForm" class="panel stack" novalidate>
@@ -1210,9 +1286,15 @@ function renderEvent() {
       <div class="seg" id="whoseSeg">${['p1', 'p2', 'both'].map(whoBtn).join('')}</div></div>
     <label class="switch-row"><span>All day</span><input type="checkbox" name="all_day" ${e.all_day ? 'checked' : ''}><span class="switch" aria-hidden="true"></span></label>
     <label>Date<input type="date" name="date" required value="${esc(e.date)}"></label>
-    <div class="two times" ${e.all_day ? 'hidden' : ''}>
-      <label>Starts<input type="time" name="start" value="${esc(e.start)}"></label>
-      <label><span>Ends <span class="opt">(optional)</span></span><input type="time" name="end" value="${esc(e.end)}"></label>
+    <div class="times" ${e.all_day ? 'hidden' : ''}>
+      <div class="two">
+        <div class="field"><span class="label">Starts</span>
+          <button type="button" class="time-btn ${e.start ? '' : 'empty'}" data-pick="start" aria-expanded="${S.picking === 'start'}">${e.start ? clock(e.start) : 'Pick a time'}</button></div>
+        <div class="field"><span class="label">Ends <span class="opt">(optional)</span></span>
+          <button type="button" class="time-btn ${e.end ? '' : 'empty'}" data-pick="end" aria-expanded="${S.picking === 'end'}">${e.end ? clock(e.end) : 'No end time'}</button></div>
+      </div>
+      <input type="hidden" name="start" value="${esc(e.start)}"><input type="hidden" name="end" value="${esc(e.end)}">
+      <div id="timePicker">${S.picking ? timePicker(S.picking, e) : ''}</div>
     </div>
     <div class="field"><span class="label">Repeat</span>
       <div class="seg" id="repSeg">${Object.keys(REPEAT).map(repBtn).join('')}</div></div>
@@ -1229,6 +1311,7 @@ function renderEvent() {
       start: String(f.get('start') ?? ''), end: String(f.get('end') ?? ''), location: String(f.get('location') ?? ''), notes: String(f.get('notes') ?? '') });
   };
   form.addEventListener('input', sync);
+  form.addEventListener('click', (x) => onTimePick(x, form, e, sync));
   form.elements.namedItem('all_day').addEventListener('change', () => { sync(); form.querySelector('.times').hidden = e.all_day; });
   $('#whoseSeg').onclick = (x) => { const b = x.target.closest('[data-whose]'); if (!b) return; e.whose = b.dataset.whose;
     document.querySelectorAll('#whoseSeg button').forEach((y) => y.classList.toggle('on', y === b)); };
@@ -1243,11 +1326,12 @@ function renderEvent() {
     const r = await rpc('save_event', {
       p_id: e.id, p_title: e.title.trim(), p_whose: e.whose, p_date: e.date, p_all_day: e.all_day,
       p_start: e.all_day ? null : e.start, p_end: e.all_day || !e.end ? null : e.end, p_repeat: e.repeat,
-      p_location: e.location.trim() || null, p_notes: e.notes.trim() || null,
+      p_location: e.location.trim() || null, p_notes: e.notes.trim() || null, ...(e.someday ? { p_someday: e.someday } : {}),
     }).catch(() => null);
     if (!r) { const s = $('#evSave'); if (s) s.disabled = false; return; }
     if (!e.id && e.whose !== me()) notify({ event: 'event_added', event_id: r.id });
-    toast(e.id ? 'Saved' : 'Added to your plans');
+    toast(e.id ? 'Saved' : 'Added to Events');
+    if (e.someday) { S.evView = 'cal'; loadSomeday(); }
     S.planDay = e.date; S.planWeek = weekStart(e.date); S.ev = null;
     S.tab = S.evBack === 'today' ? 'today' : 'plan'; render();
     loadPlan(); loadExtras();
@@ -1259,7 +1343,135 @@ function renderEvent() {
   });
 }
 
+// ----- Someday, Together: things to do together, one day -----
+const KIND = { eat: 'Eat out', go: 'Go somewhere', watch: 'Watch', make: 'Make', other: 'Other' };
+const KIND_ICON = {
+  eat: '<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 1-3 3.5-3 7h3v11"/>',
+  go: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  watch: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  make: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.4-.4-2.6z"/>',
+  other: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
+};
+const kindIcon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KIND_ICON[k] || KIND_ICON.other}</svg>`;
+
+async function loadSomeday() {
+  if (!S.status?.member) return;
+  const { data, error } = await sb.rpc('get_someday');
+  if (error) { console.warn(error); return; }
+  S.someday = data;
+  if (S.tab === 'plan' && S.evView === 'someday' && document.activeElement?.id !== 'sdInput') renderSomeday();
+}
+
+function renderSomeday() {
+  const D = S.someday;
+  if (!S.sdKind) S.sdKind = 'eat';
+  const ideas = D?.ideas ?? [];
+  const pick = S.surprise && ideas.find((i) => i.id === S.surprise);
+  const kindBtn = (k) => `<button type="button" class="kchip ${S.sdKind === k ? 'on' : ''}" data-kind="${k}">${kindIcon(k)}<span>${KIND[k]}</span></button>`;
+  const row = (i) => `
+    <li class="sd-row">
+      <span class="sd-kind k-${i.kind}" aria-label="${KIND[i.kind]}">${kindIcon(i.kind)}</span>
+      <button class="sd-main" data-act="sdEdit" data-id="${i.id}">
+        <span class="sd-title">${esc(i.title)}</span>
+        <span class="sd-sub">${i.notes ? `${esc(i.notes)} · ` : ''}${i.added_by && isPerson(i.added_by) ? `${esc(i.added_by === me() ? 'You' : nameOf(i.added_by))} added` : ''}</span>
+      </button>
+      ${i.event_id
+        ? `<button class="sd-planned" data-act="sdGoEvent" data-d="${i.event_date || ''}">${ICON.cal}<span>${i.event_date ? esc(fmtDay(i.event_date, { weekday: 'short', month: 'short', day: 'numeric' })) : 'Planned'}</span></button>`
+        : `<button class="sd-do" data-act="sdDo" data-id="${i.id}">Let's do it</button>`}
+    </li>`;
+  main().innerHTML = `
+    ${header('Things to do together', 'Events')}
+    ${evSeg()}
+    <form class="panel sd-add" id="sdForm">
+      <div class="add-row">
+        <label class="sr" for="sdInput">Something to do together</label>
+        <input id="sdInput" autocomplete="off" enterkeyhint="done" maxlength="120" placeholder="Try the new ramen place…" value="${esc(S.sdInput || '')}">
+        <button class="primary" type="submit">Add</button>
+      </div>
+      <div class="kchips" id="sdKinds">${Object.keys(KIND).map(kindBtn).join('')}</div>
+    </form>
+    ${!D ? '<div class="center muted">Loading…</div>' : `
+    ${ideas.length >= 2 ? `<div class="center-row"><button class="surprise" data-act="sdSurprise">${DICE}<span>Surprise us</span></button></div>` : ''}
+    ${pick ? `
+    <section class="sd-pick" aria-live="polite">
+      <div class="sd-pick-k">How about…</div>
+      <div class="sd-pick-t">${esc(pick.title)}</div>
+      ${pick.notes ? `<div class="sd-sub">${esc(pick.notes)}</div>` : ''}
+      <div class="row-buttons">
+        ${pick.event_id ? '' : `<button class="primary" data-act="sdDo" data-id="${pick.id}">Let's do it</button>`}
+        <button class="ghost" data-act="sdSurprise">Another</button>
+      </div>
+    </section>` : ''}
+    ${ideas.length ? `<ul class="sd-list">${ideas.map(row).join('')}</ul>`
+      : `<div class="sd-empty"><b>Your someday list is empty.</b><br>Add places to eat, trips, movies, things to make: anything you'd like to do together one day. When you're ready, tap <b>Let's do it</b> to put it on the calendar.</div>`}
+    ${D.done.length ? `
+    <h3 class="day-h">Done together · ${D.done.length}</h3>
+    <ul class="sd-list done">${D.done.map((i) => `
+      <li class="sd-row is-done">
+        <span class="sd-kind k-${i.kind}">${ICON.check}</span>
+        <button class="sd-main" data-act="sdDone" data-id="${i.id}"><span class="sd-title">${esc(i.title)}</span>
+          <span class="sd-sub">${i.done_occ ? esc(fmtDay(i.done_occ, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })) : ''}</span></button>
+      </li>`).join('')}</ul>` : ''}`}`;
+  $('#sdKinds').onclick = (x) => { const k = x.target.closest('[data-kind]'); if (!k) return; S.sdKind = k.dataset.kind;
+    document.querySelectorAll('#sdKinds .kchip').forEach((c) => c.classList.toggle('on', c === k)); };
+  $('#sdInput').oninput = (x) => { S.sdInput = x.target.value; };
+  $('#sdForm').onsubmit = async (x) => {
+    x.preventDefault();
+    const title = $('#sdInput').value.trim(); if (!title) return toast('What would you like to do?');
+    const r = await rpc('save_someday', { p_id: null, p_title: title, p_kind: S.sdKind, p_notes: null }).catch(() => null); if (!r) return;
+    S.someday = r; S.sdInput = ''; renderSomeday(); toast('Added to Someday');
+  };
+}
+const DICE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="16" cy="8" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="8" cy="16" r="1.4" fill="currentColor"/><circle cx="16" cy="16" r="1.4" fill="currentColor"/></svg>`;
+
+function openSomedayEdit(i) {
+  const d = $('#editDialog');
+  d.innerHTML = `
+  <form method="dialog" class="stack" id="sdEditForm">
+    <h2>Edit idea</h2>
+    <label>Idea<input name="title" maxlength="120" required value="${esc(i.title)}"></label>
+    <label>Kind<select name="kind">${Object.entries(KIND).map(([k, v]) => `<option value="${k}" ${k === i.kind ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <label><span>Notes <span class="opt">(optional)</span></span><textarea name="notes" rows="2" maxlength="500">${esc(i.notes || '')}</textarea></label>
+    <div class="row-buttons"><button class="primary" value="save">Save</button></div>
+    <div class="row-buttons">
+      <button value="cancel" class="ghost" formnovalidate>Cancel</button>
+      <button value="delete" class="danger" formnovalidate>Delete</button>
+    </div>
+  </form>`;
+  d.showModal();
+  d.onclose = async () => {
+    const action = d.returnValue; d.returnValue = '';
+    const f = new FormData($('#sdEditForm'));
+    let r = null;
+    if (action === 'save') r = await rpc('save_someday', { p_id: i.id, p_title: String(f.get('title') || ''), p_kind: f.get('kind'), p_notes: String(f.get('notes') || '') }).catch(() => null);
+    if (action === 'delete') { if (!confirm(`Delete "${i.title}"?`)) return; r = await rpc('delete_someday', { p_id: i.id }).catch(() => null); }
+    if (r) { S.someday = r; renderSomeday(); toast(action === 'delete' ? 'Deleted' : 'Saved'); }
+  };
+}
+
 async function onPlanClick(act, b) {
+  if (act === 'evView') { S.evView = b.dataset.v; S.surprise = null; renderPlan(); return b.dataset.v === 'someday' ? loadSomeday() : loadPlan(); }
+  if (act === 'sdSurprise') {
+    const ideas = (S.someday?.ideas ?? []).filter((i) => !i.event_id);
+    const pool = ideas.length > 1 ? ideas.filter((i) => i.id !== S.surprise) : ideas;
+    if (!pool.length) return toast('Everything on the list is already planned.');
+    S.surprise = pool[Math.floor(Math.random() * pool.length)].id; renderSomeday();
+    if (!reducedMotion()) $('.sd-pick')?.classList.add('pop');
+    return;
+  }
+  if (act === 'sdDo') {
+    const i = S.someday.ideas.find((x) => x.id === b.dataset.id); if (!i) return;
+    S.surprise = null;
+    return openEvent(null, null, { title: i.title, whose: 'both', notes: i.notes || '', someday: i.id });
+  }
+  if (act === 'sdEdit') { const i = S.someday.ideas.find((x) => x.id === b.dataset.id); if (i) openSomedayEdit(i); return; }
+  if (act === 'sdGoEvent') { S.evView = 'cal'; if (b.dataset.d) { S.planDay = b.dataset.d; S.planWeek = weekStart(b.dataset.d); } renderPlan(); return loadPlan(); }
+  if (act === 'sdDone') {
+    const i = S.someday.done.find((x) => x.id === b.dataset.id); if (!i) return;
+    if (!confirm(`Put "${i.title}" back on the Someday list?`)) return;
+    const r = await rpc('reopen_someday', { p_id: i.id }).catch(() => null); if (r) { S.someday = r; renderSomeday(); }
+    return;
+  }
   if (act === 'goPlan') { S.planWeek = weekStart(todayDay()); S.planDay = todayDay(); S.tab = 'plan'; return render(); }
   if (act === 'planDay') { S.planDay = b.dataset.d; return renderPlan(); }
   if (act === 'planWeek') { S.planWeek = addDays(S.planWeek, Number(b.dataset.n)); S.planDay = S.planWeek; renderPlan(); return loadPlan(); }
@@ -1272,6 +1484,7 @@ async function onPlanClick(act, b) {
     const r = await rpc('went_event', { p_event: b.dataset.id, p_occ: b.dataset.d }).catch(() => null);
     if (!r) { b.disabled = false; return; }
     celebrate(r.each ? '+10 Stars each!' : '+10 Stars!', b);
+    if (r.someday) { setTimeout(() => toast('Added to "Done together" ✓'), 900); loadSomeday(); }
     const { id, d } = b.dataset;
     toast('Nice. Glad you went ✓', { label: 'Undo', run: async () => {
       const u = await rpc('unwent_event', { p_event: id, p_occ: d }); if (u) { loadPlan(); loadExtras(); loadHome(); }
@@ -1287,8 +1500,7 @@ async function onPlanClick(act, b) {
 async function renderAll() {
   const body = main();
   body.innerHTML = `
-    <button class="link back" data-act="backToday">‹ Today</button>
-    ${header('Everything on your lists', 'All tasks')}
+    ${header(`${S.extras ? `${S.extras.open_total} to do · ` : ''}everything on your lists`, 'Tasks')}
     <div class="seg small" id="allSeg">
       <button class="${S.allFilter === 'open' ? 'on' : ''}" data-f="open">To do</button>
       <button class="${S.allFilter === 'done' ? 'on' : ''}" data-f="done">Done</button>
@@ -1403,7 +1615,22 @@ function renderSettings() {
   const pref = isPerson(p) ? S.status.add_pref?.[p] ?? 'all' : null;
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
   let pushBlock;
+  const prefSelect = `
+    <label>Tell me when a task is added to my list
+      <select id="addPref">
+        <option value="all" ${pref === 'all' ? 'selected' : ''}>Always</option>
+        <option value="high" ${pref === 'high' ? 'selected' : ''}>Only High priority</option>
+        <option value="off" ${pref === 'off' ? 'selected' : ''}>Never</option>
+      </select></label>`;
   if (!isPerson(p)) pushBlock = `<p class="muted">The shared screen doesn't get notifications.</p>`;
+  else if (isNative()) {
+    const np = S.nativePerm ?? 'prompt';
+    pushBlock = `
+    <p>${np === 'granted' ? 'Notifications are on for this phone.' : np === 'denied' ? 'Notifications are off. Turn them on in iPhone Settings → Notifications → One Thing.' : 'Get your task at 7 a.m., a reminder at 7 p.m. if it isn\'t done, event reminders, and a heads-up when something lands on your list.'}</p>
+    <div class="row-buttons">
+      ${np === 'granted' ? `<button id="pushTest">Send a test</button>` : np === 'denied' ? '' : `<button class="primary" id="pushOn">Turn on notifications</button>`}
+    </div>${prefSelect}`;
+  }
   else if (isIOS && !isStandalone()) pushBlock = `<p>To get notifications on iPhone, add One Thing to your Home Screen first: tap <b>Share</b> → <b>Add to Home Screen</b>, then open it from the new icon and come back here.</p>`;
   else if (perm === 'unsupported' || !('PushManager' in window)) pushBlock = `<p class="muted">This browser can't receive notifications.</p>`;
   else pushBlock = `
@@ -1433,7 +1660,7 @@ function renderSettings() {
   </div>
   <div class="panel stack">
     <h2>Calendar</h2>
-    <p class="muted">Show your Plan in the iPhone Calendar app. It updates by itself (iPhone checks about once an hour). Anyone with the link can see your plans, so keep it to yourselves.</p>
+    <p class="muted">Show your Events in the iPhone Calendar app. It updates by itself (iPhone checks about once an hour). Anyone with the link can see your events, so keep it to yourselves.</p>
     <div class="row-buttons">
       <a class="btn-link" id="icsAdd" href="${esc(icsUrl('webcal'))}">${ICON.cal}<span>Add to iPhone Calendar</span></a>
     </div>
@@ -1465,15 +1692,30 @@ function renderSettings() {
     </div>
     <button>Save names</button>
   </form>
-  <div class="panel stack">
+  ${isNative() ? '' : `<div class="panel stack">
     <h2>Backup</h2>
     <p class="muted">Saves your tasks, lists, Stars and room to a file. Worth doing once a month.</p>
     <button id="exportBtn">Export backup</button>
+  </div>`}
+  <div class="panel stack">
+    <h2>Privacy</h2>
+    <p class="muted">What we keep and why, in plain words.</p>
+    <div class="row-buttons">
+      <button data-act="doc" data-doc="privacy">Privacy policy</button>
+      <button data-act="doc" data-doc="terms">Terms</button>
+    </div>
+  </div>
+  <div class="panel stack danger-zone">
+    <h2>Delete my account</h2>
+    <p class="muted">Removes this phone's sign-in and notifications. If your partner is still in the household, they keep your shared tasks, events and home. If you're the last one, everything in the household is deleted for good.</p>
+    <button class="danger" id="deleteAcct">Delete my account</button>
   </div>
   <p class="center muted small">One Thing · version ${APP_VERSION}</p>`;
 
   $('#changeWho').onclick = () => renderWho(false);
-  $('#pushOn')?.addEventListener('click', enablePush);
+  $('#pushOn')?.addEventListener('click', isNative() ? enableNativePush : enablePush);
+  if (isNative() && isPerson(p) && S.nativePerm === undefined) nativePush()?.checkPermissions().then((r) => { S.nativePerm = r.receive; if (S.tab === 'settings') renderSettings(); }).catch(() => {});
+  $('#deleteAcct').onclick = deleteAccount;
   $('#pushTest')?.addEventListener('click', async () => {
     const { data, error } = await sb.functions.invoke('notify', { body: { event: 'test' } });
     if (error) return toast('Test failed: ' + error.message);
@@ -1492,7 +1734,7 @@ function renderSettings() {
     if (!confirm('Make a new household code?\n\nThe old code stops working right away. Devices already joined stay joined.')) return;
     const r = await rpc('regenerate_code'); if (r) { S.status = r; renderSettings(); toast('New code ready'); }
   };
-  $('#exportBtn').onclick = exportBackup;
+  $('#exportBtn')?.addEventListener('click', exportBackup);
   $('#icsCopy').onclick = async () => {
     try { await navigator.clipboard.writeText(icsUrl('https')); toast('Calendar link copied'); }
     catch { prompt('Copy this link:', icsUrl('https')); }
@@ -1511,18 +1753,19 @@ function icsUrl(scheme) {
 
 // ---------- How it works ------------------------------------------------------
 const HELP = [
-  ['Your day', `<p>Each of you gets <b>one thing</b> a day, picked for you: urgent tasks (High, or due within 2 days) go first, then Normal, then Low. The day resets at 4 a.m.</p>
+  ['Your day', `<p>The <b>Tasks</b> tab shows everything on your lists. Each of you gets <b>one thing</b> a day, picked for you: urgent tasks (High, or due within 2 days) go first, then Normal, then Low. The day resets at 4 a.m.</p>
     <p><b>Pins</b> ${ICON.pinFill} keep up to 3 tasks on your card until they're done. Use them for "this has to happen." A task due today shows a little <b>Pin it</b> prompt.</p>
     <p>Finished early? <b>Give me another</b> hands you one more.</p>`],
   ['When you can\'t today', `<p><b>✗ Swap</b>: not today. One per day; it goes back in the pile.</p>
     <p><b>⏸ Pause</b>: write where you left off (+3 Stars), pick a day to come back, and get a new task now if you want. High tasks come back pinned on their day; others rejoin the shuffle.</p>
     <p>Stuck on something for 3+ days? You'll be offered to <b>break it into a smaller first step</b>.</p>`],
-  ['Stars, XP & your home', `<p>Add a task +1 (5 a day each) · Finish +10 (High +15) · +1 per day it waited (up to +5) · Pause note +3 · Shopping done +10 (2 a day) · Went to a plan +10 (shared: +10 each) · Together bonus +5 each.</p>
+  ['Stars, XP & your home', `<p>Add a task +1 (5 a day each) · Finish +10 (High +15) · +1 per day it waited (up to +5) · Pause note +3 · Shopping done +10 (2 a day) · Went to an event +10 (shared: +10 each) · Together bonus +5 each.</p>
     <p>XP only goes up and brings <b>levels</b> — each adds something to your room. <b>Stars</b> are for the <b>Store</b>: 8 new items every Monday, plus limited seasonal pieces. Replaced items wait in <b>Storage</b>. Nothing is ever taken away, and missed days cost nothing.</p>`],
   ['Lists', `<p>Two shared lists: <b>Groceries</b> and <b>Household</b>. Type several things at once with commas ("milk, eggs, 2 avocados"). Tap a <b>Usual</b> chip to re-add something.</p>
     <p><b>List is ready</b> lets your partner know. Tick items as they go in the cart, then <b>Got everything</b>. At 8+ grocery items, <b>Order groceries</b> shows up for both of you.</p>`],
-  ['Plan', `<p>Your shared calendar. Add appointments and plans for you, your partner, or both of you, once or repeating (weekly, every 2 weeks, monthly).</p>
-    <p>You'll get a reminder <b>1 hour before</b>. Once it starts, tap <b>I went</b> for +10 Stars (shared plans: one tap, +10 each). Today's plans show at the top of Today.</p>
+  ['Events', `<p>Your shared calendar. Add appointments and plans for you, your partner, or both of you, once or repeating (weekly, every 2 weeks, monthly).</p>
+    <p>You'll get a reminder <b>1 hour before</b>. Once it starts, tap <b>I went</b> for +10 Stars (shared events: one tap, +10 each). Today's events show at the top of Today.</p>
+    <p><b>Someday, Together</b> (on the Events tab) is your list of things to do together one day: places to eat, trips, movies, projects. Stuck deciding? Tap <b>Surprise us</b>. <b>Let's do it</b> puts one on the calendar, and once you've gone it moves to <b>Done together</b>.</p>
     <p>Want them in the iPhone Calendar app too? <b>Settings → Calendar → Add to iPhone Calendar</b>.</p>`],
   ['Doing it together', `<p>Tap <b>Do ours together</b> on Today. Your partner gets a Join notification; you both get 25 minutes, and if you each finish a task before it ends, +5 Stars each.</p>`],
   ['Notifications', `<p>7 a.m.: what's on your card. 7 p.m.: only if something's still open. Plus a heads-up when your partner adds to your list, finishes something, or says a list is ready.</p>`],
@@ -1598,6 +1841,14 @@ async function enablePush() {
 }
 
 async function resyncPush() {
+  if (isNative()) {
+    try {
+      if (!isPerson(me())) return;
+      const perm = await nativePush()?.checkPermissions(); S.nativePerm = perm?.receive;
+      if (perm?.receive === 'granted') await registerNative();
+    } catch (e) { console.warn('native push resync', e); }
+    return;
+  }
   try {
     if (!isPerson(me()) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
     if (Notification.permission !== 'granted') return;
@@ -1608,9 +1859,75 @@ async function resyncPush() {
   } catch (e) { console.warn('push resync', e); }
 }
 
+// ---------- iPhone app notifications (App Store version) ------------------------
+async function saveApnsToken(token) {
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('push_subs').upsert({ endpoint: 'apns:' + token, kind: 'apns', p256dh: '', auth: '', person: me(), uid: user?.id });
+  if (error) throw error;
+}
+let nativeListening = false;
+function registerNative() {
+  const P = nativePush(); if (!P) return Promise.reject(new Error('Notifications plugin missing'));
+  return new Promise((resolve, reject) => {
+    if (!nativeListening) {
+      nativeListening = true;
+      P.addListener('registration', (t) => saveApnsToken(t.value).then(() => S._regOk?.(), (e) => S._regErr?.(e)));
+      P.addListener('registrationError', (e) => S._regErr?.(new Error(e?.error || 'registration failed')));
+    }
+    S._regOk = resolve; S._regErr = reject;
+    P.register();
+  });
+}
+async function enableNativePush() {
+  try {
+    const P = nativePush();
+    let perm = await P.checkPermissions();
+    if (perm.receive !== 'granted') perm = await P.requestPermissions();
+    S.nativePerm = perm.receive;
+    if (perm.receive !== 'granted') { toast('Notifications not allowed'); return renderSettings(); }
+    await registerNative();
+    toast('Notifications on ✓');
+  } catch (e) { console.error(e); toast('Could not turn on notifications: ' + e.message); }
+  renderSettings();
+}
+
+// Privacy policy / terms, shown inside the app (they're also public web pages for the App Store).
+async function showDoc(name) {
+  S.tab = 'doc'; render();
+  main().innerHTML = `<button class="link back" data-act="settings">‹ Settings</button><div class="center muted">Loading…</div>`;
+  try {
+    const html = await (await fetch(`${name}.html`)).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const body = doc.querySelector('main') || doc.body;
+    body.querySelectorAll('script, style, link').forEach((x) => x.remove());
+    main().innerHTML = `<button class="link back" data-act="settings">‹ Settings</button><article class="panel legal">${body.innerHTML}</article>`;
+  } catch { main().innerHTML += `<p class="center">Couldn't load that page. Check your connection.</p>`; }
+}
+
+// ---------- Delete my account (App Store requirement) ------------------------------
+async function deleteAccount() {
+  let others = 0;
+  try { others = (await rpc('household_members')).others; } catch { /* still allow deleting */ }
+  const what = others
+    ? `${nameOf(isPerson(me()) ? other(me()) : 'p1')} keeps your shared household. This phone is signed out and its notifications stop.`
+    : `You're the last one in this household, so EVERYTHING is deleted: tasks, events, lists, Stars and your home. This can't be undone.`;
+  if (!confirm(`Delete your account?\n\n${what}`)) return;
+  const typed = prompt('To confirm, type DELETE');
+  if ((typed || '').trim().toUpperCase() !== 'DELETE') return toast('Not deleted');
+  const { data, error } = await sb.functions.invoke('notify', { body: { event: 'delete_account' } });
+  if (error || !data?.ok) return toast('Could not delete: ' + (error?.message || data?.error || 'try again'));
+  try { await sb.auth.signOut(); } catch { /* already gone */ }
+  try { localStorage.clear(); } catch { /* private mode */ }
+  S.status = null; S.board = null; S.home = null;
+  $('#tabs').hidden = true; $('#fab').hidden = true;
+  main().innerHTML = `<div class="panel stack center"><h1>Account deleted</h1><p>${data.household_deleted ? 'Your household and everything in it are gone.' : 'This phone has left the household.'} Thanks for trying One Thing.</p>
+    <button class="primary" id="startOver">Start over</button></div>`;
+  $('#startOver').onclick = () => location.reload();
+}
+
 // ---------- Backup -----------------------------------------------------------
 async function exportBackup() {
-  const [{ data: tasks, error }, { data: owned }, { data: ledger }, { data: shop_items }, { data: trips }, { data: events }, { data: event_went }] = await Promise.all([
+  const [{ data: tasks, error }, { data: owned }, { data: ledger }, { data: shop_items }, { data: trips }, { data: events }, { data: event_went }, { data: someday }] = await Promise.all([
     sb.from('tasks').select('*').order('created_at'),
     sb.from('owned').select('*'),
     sb.from('ledger').select('*').order('id'),
@@ -1618,9 +1935,10 @@ async function exportBackup() {
     sb.from('trips').select('*').order('at'),
     sb.from('events').select('*').order('start_date'),
     sb.from('event_went').select('*'),
+    sb.from('someday').select('*').order('created_at'),
   ]);
   if (error) return toast(error.message);
-  const json = JSON.stringify({ exported_at: new Date().toISOString(), app_version: APP_VERSION, names: S.status.names, tasks, owned, ledger, shop_items, trips, events, event_went }, null, 2);
+  const json = JSON.stringify({ exported_at: new Date().toISOString(), app_version: APP_VERSION, names: S.status.names, tasks, owned, ledger, shop_items, trips, events, event_went, someday }, null, 2);
   const name = `one-thing-backup-${localISO()}.json`;
   const file = new File([json], name, { type: 'application/json' });
   try {

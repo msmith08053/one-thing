@@ -16,7 +16,8 @@ One task each, every day. A shared to-do app for two people with ADHD: you can d
   - **✓** = done (with a few seconds to undo). **✗** = "not today," which uses your **one swap per day**. The task goes back in the pile.
   - After you finish, **Give me another** gives you one more.
   - After 3 days on your card, a task offers to be **broken into a smaller first step**.
-- **Plan** is your shared calendar: plans for you, your partner, or both of you. You get a reminder 1 hour before, and **I went** earns +10 Stars. Plans can also show in the iPhone Calendar app (Settings → Calendar).
+- **Tasks** shows everything on your lists. **Events** is your shared calendar, plus **Someday, Together**: a list of things to do together one day.
+- **Events** is your shared calendar: plans for you, your partner, or both of you. You get a reminder 1 hour before, and **I went** earns +10 Stars. Plans can also show in the iPhone Calendar app (Settings → Calendar).
 - **Our Home:** every task earns Stars and XP. Levels add furniture to a shared room, and the Store (8 items, new every Monday) lets you pick more. **Pause** (⏸) saves a "left off" note without using your swap. See `UPGRADE.md` for the full table.
 - **Notifications:**
   - 7 a.m.: your task(s) for today.
@@ -43,7 +44,7 @@ You need a computer for steps 1–8 (any computer with a web browser), then your
 1. Left sidebar → **SQL Editor** → **New query**.
 2. Open `supabase/schema.sql` from this folder, copy **everything**, and paste it in.
 3. Click **Run**. You should see *Success. No rows returned.*
-4. Do the same with `supabase/002_our_home.sql`, then `003_lists_pause_together.sql`, then `004_households_pins.sql`, then `005_calendar.sql` (in that order).
+4. Do the same with `supabase/002_our_home.sql`, then `003_lists_pause_together.sql`, then `004_households_pins.sql`, then `005_calendar.sql`, then `006_someday_store.sql` (in that order).
 
 ### 3. Make your notification keys
 
@@ -153,7 +154,11 @@ supabase/schema.sql              database setup (step 2)
 supabase/002_our_home.sql        Our Home upgrade: Stars, levels, Store (step 2.4)
 supabase/003_lists_pause_together.sql  Lists, new Pause, together timer, seasonal + walls
 supabase/004_households_pins.sql Households + join codes, pins, fixes
-supabase/005_calendar.sql        Plan: events, I went, reminders, calendar feed
+supabase/005_calendar.sql        Events: I went, reminders, calendar feed
+supabase/006_someday_store.sql   Someday Together, delete account, iPhone app notifications
+vendor/supabase.js, fonts/       the database library and fonts, bundled (nothing downloaded at runtime)
+privacy.html, terms.html, support.html   public pages the App Store needs
+native/, codemagic.yaml          the iPhone App Store app (see STORE-LAUNCH.md)
 version.json                     tells phones a new version is out (bump it with each update)
 supabase/functions/notify/       notification sender (step 4)
 supabase/cron.sql                7 a.m. / 7 p.m. schedule (step 5)
@@ -166,6 +171,8 @@ tools/make-keys.html             key generator (step 3)
 - `UPGRADE-v3.md`: Lists, new Pause, Do it together, seasonal items, walls & floors
 - `UPGRADE-v4.md`: households and codes, pins, How it works, new logo, fixes
 - `UPGRADE-v5.md`: Plan (shared calendar), See all tasks, flat grocery Stars
+- `UPGRADE-v6.md`: Tasks/Events tabs, Someday Together, time picker, Done animation, living room, App Store groundwork
+- `STORE-LAUNCH.md` + `APP-STORE-LISTING.md`: putting it on the iPhone App Store
 
 ## Roadmap
 
