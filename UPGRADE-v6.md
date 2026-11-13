@@ -42,7 +42,7 @@ Nothing changes for web notifications. The Apple notification settings are added
 This release has more files and folders than usual. Use **Add file → Upload files** and drag in **everything in this folder except `config.js`**:
 
 - Files: `index.html`, `app.js`, `styles.css`, `room.js`, `version.json`, `manifest.webmanifest`, `privacy.html`, `terms.html`, `support.html`, `codemagic.yaml`, `README.md`, `UPGRADE-v6.md`, `STORE-LAUNCH.md`, `APP-STORE-LISTING.md`
-- Folders: **`vendor`**, **`fonts`**, **`native`**, **`supabase`**
+- Folders: **`lib`**, **`fonts`**, **`native`**, **`supabase`**
 
 Then click **Commit**.
 
@@ -70,6 +70,6 @@ Then click **Commit**.
 | Problem | Fix |
 |---|---|
 | Errors mentioning `get_someday` or `save_someday` | Step 2 didn't run. Run `006_someday_store.sql` again; it's safe to repeat. |
-| The app is stuck on "Loading…" | The `vendor` folder didn't upload. Check that `vendor/supabase.js` is on GitHub. |
+| The app is stuck on "Loading…" | The `lib` folder didn't upload. Check that `https://YOUR-USERNAME.github.io/one-thing/lib/supabase.js` opens (it shows a page of code). |
 | Text shows in a plain system font | The `fonts` folder didn't upload. |
 | Still the old tab bar | Close the app fully and reopen it, or wait for the Refresh banner. |

@@ -1,9 +1,9 @@
 // One Thing — app logic (v6: Events, Someday Together, store-ready)
-import { createClient } from './vendor/supabase.js';   // bundled (no code downloaded at runtime)
+import { createClient } from './lib/supabase.js';   // bundled (no code downloaded at runtime)
 import { CONFIG } from './config.js';
-import { SPOTS, STYLE_SPOTS, roomSVG, itemThumb, isEvening } from './room.js?v=6';
+import { SPOTS, STYLE_SPOTS, roomSVG, itemThumb, isEvening } from './room.js?v=6.1';
 
-const APP_VERSION = '6';
+const APP_VERSION = '6.1';
 
 // ---------- Small helpers ----------------------------------------------------
 const $ = (sel, el = document) => el.querySelector(sel);
