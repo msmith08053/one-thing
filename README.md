@@ -156,7 +156,7 @@ supabase/003_lists_pause_together.sql  Lists, new Pause, together timer, seasona
 supabase/004_households_pins.sql Households + join codes, pins, fixes
 supabase/005_calendar.sql        Events: I went, reminders, calendar feed
 supabase/006_someday_store.sql   Someday Together, delete account, iPhone app notifications
-vendor/supabase.js, fonts/       the database library and fonts, bundled (nothing downloaded at runtime)
+supabase-lib.js, fonts/          the database library and fonts, bundled (nothing downloaded at runtime)
 privacy.html, terms.html, support.html   public pages the App Store needs
 native/, codemagic.yaml          the iPhone App Store app (see STORE-LAUNCH.md)
 version.json                     tells phones a new version is out (bump it with each update)

@@ -1,0 +1,15 @@
+{
+  "appId": "com.YOURNAME.onething",
+  "appName": "One Thing",
+  "webDir": "www",
+  "backgroundColor": "#FFF8EC",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "One Thing"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

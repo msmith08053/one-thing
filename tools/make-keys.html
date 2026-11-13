@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One Thing — make keys</title>
+<style>
+  body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 640px; margin: 32px auto; padding: 0 16px; color: #1f2328; }
+  button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 0; background: #2f6f4f; color: #fff; cursor: pointer; }
+  label { display: block; font-weight: 600; margin-top: 18px; }
+  textarea { width: 100%; font: 13px ui-monospace, monospace; padding: 8px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+  .note { color: #57606a; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Make your keys</h1>
+<p>This runs entirely in your browser. Nothing is sent anywhere. Click the button once and copy each value where the setup guide tells you.</p>
+<button id="go">Generate keys</button>
+
+<label>VAPID_PUBLIC_KEY <span class="note">(goes in Supabase secrets <em>and</em> in config.js)</span></label>
+<textarea id="pub" rows="3" readonly></textarea>
+
+<label>VAPID_PRIVATE_KEY <span class="note">(Supabase secrets only — keep this private)</span></label>
+<textarea id="priv" rows="2" readonly></textarea>
+
+<label>CRON_SECRET <span class="note">(Supabase secrets <em>and</em> cron.sql)</span></label>
+<textarea id="cron" rows="2" readonly></textarea>
+
+<script>
+const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+document.getElementById('go').onclick = async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const raw = await crypto.subtle.exportKey('raw', pair.publicKey);   // 65-byte uncompressed point
+  const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);  // jwk.d = 32-byte private scalar
+  document.getElementById('pub').value = b64url(raw);
+  document.getElementById('priv').value = jwk.d;
+  document.getElementById('cron').value = b64url(crypto.getRandomValues(new Uint8Array(24)));
+};
+</script>
+</body>
+</html>

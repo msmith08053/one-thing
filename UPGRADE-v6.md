@@ -39,12 +39,11 @@ Nothing changes for web notifications. The Apple notification settings are added
 
 ## 4. Upload the app files to GitHub
 
-This release has more files and folders than usual. Use **Add file → Upload files** and drag in **everything in this folder except `config.js`**:
+Use **Add file → Upload files**.
 
-- Files: `index.html`, `app.js`, `styles.css`, `room.js`, `version.json`, `manifest.webmanifest`, `privacy.html`, `terms.html`, `support.html`, `codemagic.yaml`, `README.md`, `UPGRADE-v6.md`, `STORE-LAUNCH.md`, `APP-STORE-LISTING.md`
-- Folders: **`lib`**, **`fonts`**, **`native`**, **`supabase`**
-
-Then click **Commit**.
+1. **Files:** select these and drag them in: `index.html`, `app.js`, `supabase-lib.js`, `styles.css`, `room.js`, `version.json`, `manifest.webmanifest`, `privacy.html`, `terms.html`, `support.html`, `codemagic.yaml`, `README.md`, `UPGRADE-v6.md`, `STORE-LAUNCH.md`, `APP-STORE-LISTING.md`.
+2. **Folders:** drag the **`fonts`**, **`icons`**, **`native`** and **`supabase`** folders themselves from File Explorer onto the upload page. The **"choose your files"** button can't pick folders, so it quietly leaves them out. GitHub shows the folder names in the file list before you commit.
+3. Click **Commit**.
 
 > **The logo fix needs the `icons` folder to be on GitHub.** Check by opening `https://YOUR-USERNAME.github.io/one-thing/icons/favicon-32.png`. If you see a 404 page, upload the `icons` folder from the v4 package as well. Most likely, that's why the browser showed a globe.
 
@@ -70,6 +69,6 @@ Then click **Commit**.
 | Problem | Fix |
 |---|---|
 | Errors mentioning `get_someday` or `save_someday` | Step 2 didn't run. Run `006_someday_store.sql` again; it's safe to repeat. |
-| The app is stuck on "Loading…" | The `lib` folder didn't upload. Check that `https://YOUR-USERNAME.github.io/one-thing/lib/supabase.js` opens (it shows a page of code). |
+| The app is stuck on "Loading…" | `supabase-lib.js` didn't upload. Check that `https://YOUR-USERNAME.github.io/one-thing/supabase-lib.js` opens (it shows a page of code). |
 | Text shows in a plain system font | The `fonts` folder didn't upload. |
 | Still the old tab bar | Close the app fully and reopen it, or wait for the Refresh banner. |
